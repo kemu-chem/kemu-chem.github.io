@@ -8,3 +8,6 @@ build/
 test_rispy.py
 upload.py
 start_server.py
+sample.bib
+sample.ris
+sample.txt

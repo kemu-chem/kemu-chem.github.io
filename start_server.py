@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 
 PORT = 8000
-HTML_FILE = "bib2ref.html"
+HTML_FILE = "index.html"
 
 def start_server():
     # カレントディレクトリをスクリプトの場所に変更

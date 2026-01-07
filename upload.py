@@ -14,7 +14,10 @@ IGNORE_PATTERNS = [
     'build/',
     'test_rispy.py',
     'upload.py',
-    'start_server.py'
+    'start_server.py',
+    'sample.bib',
+    'sample.ris',
+    'sample.txt'
 ]
 BRANCH_NAME = 'main'
 REMOTE_NAME = 'origin'
