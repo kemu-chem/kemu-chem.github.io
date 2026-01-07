@@ -1,0 +1,10 @@
+__pycache__
+*.pyc
+venv/
+.DS_Store
+.env
+dist/
+build/
+test_rispy.py
+upload.py
+start_server.py

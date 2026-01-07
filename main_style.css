@@ -1,0 +1,69 @@
+:root {
+    --primary: #2563eb;
+}
+
+body {
+    font-family: sans-serif;
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #f8fafc;
+}
+
+.card {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#drop_zone {
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    padding: 30px;
+    text-align: center;
+    color: #64748b;
+    margin-bottom: 15px;
+    cursor: pointer;
+    background: #fff;
+}
+
+#drop_zone.dragging {
+    border-color: var(--primary);
+    background: #eff6ff;
+}
+
+textarea {
+    width: 100%;
+    height: 150px;
+    margin-bottom: 10px;
+    padding: 10px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+}
+
+#output {
+    background: white;
+    border: 1px solid #e2e8f0;
+    padding: 20px;
+    min-height: 150px;
+    font-family: "Times New Roman", serif;
+    margin-top: 10px;
+}
+
+.citation-item {
+    margin-bottom: 1em;
+}
+
+b {
+    font-weight: bold !important;
+}
+
+i {
+    font-style: italic !important;
+}
+
+.loading {
+    color: var(--primary);
+    font-weight: bold;
+}

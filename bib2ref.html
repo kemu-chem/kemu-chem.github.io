@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Bib2Ref Web</title>
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <link rel="stylesheet" href="main_style.css">
+</head>
+
+<body>
+    <div class="card">
+        <h1>Bib2Ref Web (BibTeX & RIS & DOI)</h1>
+        <div id="status-msg" class="loading">Initializing python environment...</div>
+
+        <div id="drop_zone">Drop .bib/.ris/.txt files, or click here to select files. (.bib / .ris / .txt)</div>
+        <input type="file" id="file_input" style="display:none" accept=".bib,.ris,.txt">
+
+        <textarea id="bib_input" placeholder="Paste content here..."></textarea>
+
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <select id="style_select">
+                <option>ACS</option>
+                <option>APA (7th)</option>
+                <option>Harvard</option>
+                <option>Vancouver</option>
+                <option>Angewandte</option>
+                <option>RSC</option>
+                <option>Nature</option>
+                <option>IEEE</option>
+                <option>ISO 690</option>
+            </select>
+            <select id="sort_select">
+                <option>Order of Appearance</option>
+                <option>Author (A-Z)</option>
+                <option>Year (Old→New)</option>
+            </select>
+            <input type="number" id="max_n_input" placeholder="Max Authors" style="width: 80px; padding: 5px;" min="1">
+            <label style="display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" id="omit_title_check">
+                <span>Omit Title</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" id="reverse_authors_check">
+                <span>Reverse 1st & Last</span>
+            </label>
+            <!--<button id="convert_btn" py-click="on_convert" disabled>Generate</button>-->
+            <!--<button id="debug_btn" py-click="show_debug_info">Debug Info</button>
+            <button id="reload_modules_btn" py-click="reload_modules">Force Reload Modules</button>-->
+        </div>
+
+        <div id="output"></div>
+        <div id="cache-info" style="font-size: small; color: blue; margin-top: 10px;"></div>
+        <div id="note" style="font-size: small;">Note: This is a web application and does not store any data on the
+            server.</div>
+        <div id="help"
+            style="font-size: small; margin-top: 10px; padding: 10px; background-color: #f9f9f9; border-left: 3px solid #4CAF50;">
+            <strong>Help:</strong> You can paste different formats:
+            <ul style="margin: 5px 0; padding-left: 20px;">
+                <li><strong>BibTeX:</strong> Entries starting with @article, @book, etc.</li>
+                <li><strong>RIS:</strong> Entries with TY, AU, TI tags</li>
+                <li><strong>DOI List (.txt):</strong> One DOI per line. Examples:
+                    <div
+                        style="background-color: #fff; padding: 5px; margin-top: 5px; border: 1px solid #ddd; font-family: monospace;">
+                        10.1002/anie.202201234<br>
+                        https://doi.org/10.1038/s41586-023-12345-6<br>
+                        doi.org/10.1126/science.abc1234
+                    </div>
+                </li>
+            </ul>
+        </div>
+
+        <div id="author" style="font-size: small;">Author: kemu-chem</div>
+        <div id="version" style="font-size: small;">Version: 1.0.1</div>
+        <a data-ofuse-widget-button href="https://ofuse.me/o?uid=145324" data-ofuse-id="145324" data-ofuse-size="large"
+            data-ofuse-text="Donate with OFUSE">Donate with OFUSE</a>
+        <script async src="https://ofuse.me/assets/platform/widget.js" charset="utf-8"></script>
+
+    </div>
+
+    <py-config>
+        packages = ["bibtexparser", "rispy"]
+        [[fetch]]
+        files = ["src/bibcite_core.py","src/riscite_core.py", "src/doicite_core.py"]
+    </py-config>
+
+    <script type="py">
+        """
+        For transparency and debugging purposes, data loading process and data sorting process is implemented in this html file.
+
+        The main function is on_convert.
+
+        The data loading process is implemented in the try block.
+
+        The data sorting process is implemented in the on_convert function.
+
+        You can edit this code in the browser for debugging and particular use cases.
+        """
+
+        import re
+        import asyncio
+        from pyscript import document
+        # Wait until external files are loaded
+        try:
+            from src.riscite_core import RISProcessor, REFERENCE_STYLES, BibTeXProcessor, rtf_to_html
+            from src.doicite_core import DOIProcessor
+            document.querySelector("#status-msg").style.display = "none"
+            # Enable convert button if it exists
+            convert_btn = document.querySelector("#convert_btn")
+            if convert_btn:
+                convert_btn.disabled = False
+        except Exception as e:
+            document.querySelector("#output").innerText = f"Error loading core: {e}"
+
+        # DOI Cache to avoid re-fetching
+        doi_cache = {}
+
+        def get_clean_doi(raw):
+            if "doi.org/" in raw:
+                return raw.split("doi.org/")[-1].strip()
+            return raw.strip()
+
+        def reload_modules(event):
+            """Force reload modules from server"""
+            import sys
+            from importlib import reload
+
+            cache_info_div = document.querySelector("#cache-info")
+
+            try:
+                # Remove modules from cache
+                modules_to_remove = [mod for mod in sys.modules.keys() if mod.startswith('src.')]
+                for mod in modules_to_remove:
+                    del sys.modules[mod]
+
+                # Reload modules
+                from src.riscite_core import RISProcessor, REFERENCE_STYLES, BibTeXProcessor, rtf_to_html
+                from src.doicite_core import DOIProcessor
+
+                # Update global references
+                globals()['RISProcessor'] = RISProcessor
+                globals()['REFERENCE_STYLES'] = REFERENCE_STYLES
+                globals()['BibTeXProcessor'] = BibTeXProcessor
+                globals()['rtf_to_html'] = rtf_to_html
+                globals()['DOIProcessor'] = DOIProcessor
+
+                cache_info_div.innerHTML = f"✓ Modules reloaded successfully! Removed {len(modules_to_remove)} cached modules."
+                cache_info_div.style.color = "green"
+
+                # Show current signature
+                import inspect
+                sig = inspect.signature(REFERENCE_STYLES.get("ACS"))
+                cache_info_div.innerHTML += f"<br>ACS formatter params: {', '.join([p for p in sig.parameters.keys()])}"
+
+            except Exception as e:
+                cache_info_div.innerHTML = f"✗ Error reloading modules: {e}"
+                cache_info_div.style.color = "red"
+
+        def show_debug_info(event):
+            """Display debug information about loaded modules"""
+            import inspect
+            output_div = document.querySelector("#output")
+
+            debug_html = "<h3>Debug Information</h3>"
+
+            # Check if CitationFormatter is loaded
+            try:
+                from src.bibcite_core import CitationFormatter
+                debug_html += "<p><b>CitationFormatter loaded:</b> Yes</p>"
+
+                # Check format_acs signature
+                sig = inspect.signature(CitationFormatter.format_acs)
+                debug_html += f"<p><b>format_acs signature:</b> {sig}</p>"
+
+                # List all parameters
+                debug_html += "<p><b>format_acs parameters:</b> "
+                debug_html += ", ".join([p for p in sig.parameters.keys()])
+                debug_html += "</p>"
+
+            except Exception as e:
+                debug_html += f"<p><b>Error loading CitationFormatter:</b> {e}</p>"
+
+            # Check REFERENCE_STYLES
+            try:
+                formatter = REFERENCE_STYLES.get("ACS")
+                debug_html += f"<p><b>ACS formatter:</b> {formatter}</p>"
+
+                if formatter:
+                    sig = inspect.signature(formatter)
+                    debug_html += f"<p><b>ACS formatter signature:</b> {sig}</p>"
+                    debug_html += "<p><b>ACS formatter parameters:</b> "
+                    debug_html += ", ".join([p for p in sig.parameters.keys()])
+                    debug_html += "</p>"
+            except Exception as e:
+                debug_html += f"<p><b>Error checking formatter:</b> {e}</p>"
+
+            # Module location info
+            try:
+                import src.bibcite_core as bc
+                debug_html += f"<p><b>bibcite_core module:</b> {bc.__file__ if hasattr(bc, '__file__') else 'No __file__ attribute'}</p>"
+            except Exception as e:
+                debug_html += f"<p><b>Error getting module info:</b> {e}</p>"
+
+            # Check sys.modules
+            import sys
+            src_modules = [m for m in sys.modules.keys() if m.startswith('src.')]
+            debug_html += f"<p><b>Loaded src modules:</b> {', '.join(src_modules)}</p>"
+
+            output_div.innerHTML = debug_html
+
+        async def on_convert(event=None):
+            raw_input = document.querySelector("#bib_input").value.strip()
+
+            # If no input, clear output
+            if not raw_input:
+                document.querySelector("#output").innerHTML = ""
+                return
+
+            style_name = document.querySelector("#style_select").value
+            sort_name = document.querySelector("#sort_select").value
+            max_n_str = document.querySelector("#max_n_input").value
+            max_n = int(max_n_str) if max_n_str else None
+            omit_title = document.querySelector("#omit_title_check").checked
+            reverse_authors = document.querySelector("#reverse_authors_check").checked
+
+            output_div = document.querySelector("#output")
+            output_div.innerHTML = "Processing..."
+            
+            try:
+                entries = []
+                # 判定: BibTeX, DOI, or RIS
+                if raw_input.startswith('@'):
+                    entries = BibTeXProcessor.parse_bibtex(raw_input)
+                elif raw_input.startswith('10.') or raw_input.startswith('http'):
+                    # DOI Processing with Cache
+                    try:
+                        input_lines = [line.strip() for line in raw_input.split('\n') if line.strip()]
+                        
+                        dois_to_fetch = []
+                        ordered_keys = []
+                        
+                        # Check Cache
+                        for line in input_lines:
+                            key = get_clean_doi(line)
+                            ordered_keys.append(key)
+                            if key not in doi_cache:
+                                if key not in dois_to_fetch:
+                                    dois_to_fetch.append(key)
+                        
+                        if dois_to_fetch:
+                            output_div.innerHTML = f"Fetching {len(dois_to_fetch)} new DOIs from Crossref..."
+                            fetch_str = "\n".join(dois_to_fetch)
+                            new_entries = await DOIProcessor.fetch_doi_entries(fetch_str)
+                            
+                            # Cache new entries
+                            # Note: We rely on the fact that fetched entries contain 'doi'. 
+                            # If fetch fails for some, they won't be in new_entries.
+                            for entry in new_entries:
+                                if 'doi' in entry:
+                                    # Normalize doi from entry to match our key format if possible
+                                    # But entry['doi'] is what Crossref returns.
+                                    # We should also map the requested key to this entry.
+                                    # Since we don't know exactly which key produced which entry (async/batch), 
+                                    # we rely on the DOI in the entry matching the requested DOI.
+                                    
+                                    # Try to clean the doi from the entry to use as a key
+                                    entry_key = get_clean_doi(entry['doi'])
+                                    doi_cache[entry_key] = entry
+                                    
+                                    # Also, try to match against requested dois_to_fetch to handle case mismatches?
+                                    # For now, simple mapping.
+                        
+                        # Reconstruct list from cache
+                        entries = []
+                        for key in ordered_keys:
+                            # Try exact match first
+                            if key in doi_cache:
+                                entries.append(doi_cache[key])
+                            else:
+                                # Fallback: try case-insensitive match for cache keys
+                                found = False
+                                for c_key, c_val in doi_cache.items():
+                                    if c_key.lower() == key.lower():
+                                        entries.append(c_val)
+                                        found = True
+                                        break
+                                if not found:
+                                    print(f"Warning: Could not resolve DOI {key}")
+
+                    except Exception as e:
+                        output_div.innerHTML = f"Error fetching DOI: {e}"
+                        return
+                else:
+                    entries = RISProcessor.parse_ris(raw_input)
+                    
+                if not entries:
+                    output_div.innerHTML = '<span style="color:red">Invalid entries found. Please check the format.</span>'
+                    return
+                
+                formatter = REFERENCE_STYLES.get(style_name)
+                html_output = ""
+                for i, entry in enumerate(entries, 1):
+                    # Reverse 1st and last author if requested
+                    if reverse_authors and 'author' in entry:
+                        authors_list = [a.strip() for a in entry['author'].split(' and ')]
+                        if len(authors_list) >= 2:
+                            authors_list[0], authors_list[-1] = authors_list[-1], authors_list[0]
+                            entry['author'] = ' and '.join(authors_list)
+
+                # sorting
+                if "Author" in sort_name:
+                    entries.sort(key=lambda x: BibTeXProcessor.parse_authors(x.get("author", ""))[0]["family"].lower() if x.get("author") else "zzz")
+                elif "Year" in sort_name:
+                    entries.sort(key=lambda x: int(re.search(r'\d{4}', x.get("year", "0")).group()) if re.search(r'\d{4}', x.get("year", "")) else 0)
+
+                for i, entry in enumerate(entries, 1):
+                    _, rtf = formatter(entry, i, max_n=max_n, omit_title=omit_title, reverse_authors=False)
+                    html_output += f'<div class="citation-item">{rtf_to_html(rtf)}</div>'
+
+                output_div.innerHTML = html_output
+            except Exception as e:
+                output_div.innerHTML = f"Error: {e}"
+
+        # Make on_convert available globally for JavaScript
+        import js
+        js.window.py_on_convert = on_convert
+    </script>
+
+    <script>
+        const dropZone = document.getElementById('drop_zone');
+        const fileInput = document.getElementById('file_input');
+        const bibInput = document.getElementById('bib_input');
+
+        // Auto-convert trigger function
+        function triggerConvert() {
+            // Check if Python on_convert is available
+            if (window.py_on_convert) {
+                try {
+                    // Trigger the Python on_convert function
+                    window.py_on_convert();
+                } catch (e) {
+                    console.log('Error calling py_on_convert:', e);
+                }
+            }
+        }
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragging'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragging');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                bibInput.value = e.target.result;
+                // Trigger conversion after file is loaded
+                setTimeout(triggerConvert, 100);
+            };
+            reader.readAsText(files[0]);
+        }
+
+        // Add event listeners for auto-conversion
+        window.addEventListener('DOMContentLoaded', () => {
+            // Wait for PyScript to be ready
+            const setupAutoConvert = () => {
+                const styleSelect = document.getElementById('style_select');
+                const sortSelect = document.getElementById('sort_select');
+                const maxNInput = document.getElementById('max_n_input');
+                const omitTitleCheck = document.getElementById('omit_title_check');
+                const reverseAuthorsCheck = document.getElementById('reverse_authors_check');
+
+                // Auto-convert on textarea input (with debounce)
+                let inputTimeout;
+                bibInput.addEventListener('input', () => {
+                    clearTimeout(inputTimeout);
+                    inputTimeout = setTimeout(triggerConvert, 500); // 500ms debounce
+                });
+
+                // Auto-convert on option changes
+                styleSelect.addEventListener('change', triggerConvert);
+                sortSelect.addEventListener('change', triggerConvert);
+                maxNInput.addEventListener('input', () => {
+                    clearTimeout(inputTimeout);
+                    inputTimeout = setTimeout(triggerConvert, 500);
+                });
+                omitTitleCheck.addEventListener('change', triggerConvert);
+                reverseAuthorsCheck.addEventListener('change', triggerConvert);
+            };
+
+            // Wait for PyScript to initialize
+            setTimeout(setupAutoConvert, 1000);
+        });
+    </script>
+</body>
+
+</html>

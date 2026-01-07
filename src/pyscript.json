@@ -1,0 +1,10 @@
+{
+    "packages": [
+        "bibtexparser",
+        "rispy"
+    ],
+    "files": {
+        "bibcite_core.py": "./bibcite_core.py",
+        "riscite_core.py": "./riscite_core.py"
+    }
+}
