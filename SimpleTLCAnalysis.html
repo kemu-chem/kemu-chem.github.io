@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TLC Plate Analysis</title>
+    <link rel="stylesheet" href="main_style.css">
+    <style>
+        h1 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .subtitle {
+            color: #777;
+            margin-bottom: 20px;
+        }
+
+        /* Input section */
+        .input-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .input-section button {
+            padding: 10px 20px;
+            border: 1px solid var(--primary);
+            background: var(--primary);
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .input-section button:hover {
+            opacity: 0.9;
+        }
+
+        /* Camera */
+        #camera-container {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        #camera-preview {
+            max-width: 100%;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+
+        #camera-container .cam-btns {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        #camera-container .cam-btns button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #capture-btn {
+            background: #22c55e;
+            color: white;
+            border-color: #22c55e !important;
+        }
+
+        #cancel-camera {
+            background: #f1f5f9;
+        }
+
+        /* Canvas */
+        #canvas-container {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        #main-canvas {
+            max-width: 100%;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            cursor: crosshair;
+        }
+
+        .no-image-msg {
+            color: #94a3b8;
+            padding: 60px 20px;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        /* Mode buttons */
+        .mode-section {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .mode-btn {
+            padding: 8px 14px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.15s;
+        }
+
+        .mode-btn:hover {
+            border-color: var(--primary);
+        }
+
+        .mode-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        #clear-all {
+            background: #fef2f2;
+            border-color: #fca5a5;
+            color: #dc2626;
+        }
+
+        #clear-all:hover {
+            background: #fee2e2;
+        }
+
+        /* Adjustments */
+        .adjustments {
+            margin-bottom: 20px;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .slider-row label {
+            width: 90px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .slider-row input[type="range"] {
+            flex: 1;
+        }
+
+        .slider-row .slider-val {
+            width: 40px;
+            text-align: right;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .threshold-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .threshold-row label {
+            font-size: 13px;
+            color: #555;
+            cursor: pointer;
+        }
+
+        /* Lane width */
+        .lane-width-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .lane-width-row label {
+            font-size: 13px;
+            color: #555;
+        }
+
+        .lane-width-row input[type="number"] {
+            width: 60px;
+            padding: 4px 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        /* Results */
+        .results-section {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .rf-results {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .rf-results h3,
+        .profile-section h3 {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        #rf-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        #rf-table th,
+        #rf-table td {
+            padding: 6px 10px;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+        }
+
+        #rf-table th {
+            background: #f1f5f9;
+            font-weight: 600;
+        }
+
+        .profile-section {
+            flex: 2;
+            min-width: 300px;
+        }
+
+        #chart-canvas {
+            width: 100%;
+            height: 200px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+        }
+
+        .empty-msg {
+            color: #94a3b8;
+            font-size: 13px;
+            font-style: italic;
+        }
+
+        /* Footer */
+        .page-footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #aaa;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>TLC Plate Analysis</h1>
+        <p class="subtitle">Rf Calculation &amp; Intensity Profile</p>
+
+        <!-- Image Input -->
+        <div class="input-section">
+            <button id="upload-btn" onclick="document.getElementById('file-input').click()">Upload Image</button>
+            <button id="camera-btn">Capture from Camera</button>
+            <input type="file" id="file-input" accept="image/*" hidden>
+        </div>
+
+        <!-- Camera Preview -->
+        <div id="camera-container" hidden>
+            <video id="camera-preview" autoplay playsinline></video>
+            <div class="cam-btns">
+                <button id="capture-btn">Take Photo</button>
+                <button id="cancel-camera">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Canvas -->
+        <div id="canvas-container">
+            <div class="no-image-msg" id="placeholder-msg">Upload or capture a TLC plate image to begin</div>
+            <canvas id="main-canvas" hidden></canvas>
+        </div>
+
+        <!-- Controls (hidden until image loaded) -->
+        <div id="controls" hidden>
+            <!-- Mode Buttons -->
+            <div class="mode-section">
+                <button class="mode-btn" data-mode="origin">Set Origin</button>
+                <button class="mode-btn" data-mode="front">Set Solvent Front</button>
+                <button class="mode-btn" data-mode="spot">Mark Spots</button>
+                <button class="mode-btn" data-mode="lane">Select Lane</button>
+                <button id="clear-all">Clear All</button>
+            </div>
+
+            <!-- Adjustments -->
+            <div class="adjustments">
+                <div class="slider-row">
+                    <label>Brightness</label>
+                    <input type="range" id="brightness-slider" min="-100" max="100" value="0">
+                    <span class="slider-val" id="brightness-val">0</span>
+                </div>
+                <div class="slider-row">
+                    <label>Contrast</label>
+                    <input type="range" id="contrast-slider" min="-100" max="100" value="0">
+                    <span class="slider-val" id="contrast-val">0</span>
+                </div>
+                <div class="threshold-row">
+                    <input type="checkbox" id="threshold-toggle">
+                    <label for="threshold-toggle">Enable Binary View</label>
+                </div>
+                <div class="slider-row" id="threshold-row" hidden>
+                    <label>Threshold</label>
+                    <input type="range" id="threshold-slider" min="0" max="255" value="128">
+                    <span class="slider-val" id="threshold-val">128</span>
+                </div>
+                <div class="lane-width-row">
+                    <label>Lane Width (px):</label>
+                    <input type="number" id="lane-width" value="20" min="1" max="200">
+                </div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-section" id="results" hidden>
+            <div class="rf-results">
+                <h3>Rf Values</h3>
+                <table id="rf-table">
+                    <thead>
+                        <tr>
+                            <th>Spot #</th>
+                            <th>Rf</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rf-tbody"></tbody>
+                </table>
+                <p class="empty-msg" id="no-spots-msg">Mark spots on the image to calculate Rf values</p>
+            </div>
+            <div class="profile-section">
+                <h3>Intensity Profile</h3>
+                <canvas id="chart-canvas"></canvas>
+                <p class="empty-msg" id="no-lane-msg">Select a lane to view intensity profile</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-footer">
+        <a href="index.html">&larr; Back to Tools</a>
+    </div>
+
+    <script src="src/tlc_analysis.js"></script>
+    <script>
+        (function () {
+            "use strict";
+
+            const TLC = window.TLCAnalysis;
+            const canvas = document.getElementById("main-canvas");
+            const chartCanvas = document.getElementById("chart-canvas");
+            const fileInput = document.getElementById("file-input");
+            const cameraBtn = document.getElementById("camera-btn");
+            const cameraContainer = document.getElementById("camera-container");
+            const video = document.getElementById("camera-preview");
+            const captureBtn = document.getElementById("capture-btn");
+            const cancelCamera = document.getElementById("cancel-camera");
+            const controls = document.getElementById("controls");
+            const results = document.getElementById("results");
+            const placeholderMsg = document.getElementById("placeholder-msg");
+            const rfTbody = document.getElementById("rf-tbody");
+            const noSpotsMsg = document.getElementById("no-spots-msg");
+            const noLaneMsg = document.getElementById("no-lane-msg");
+            const modeButtons = document.querySelectorAll(".mode-btn");
+
+            let cameraStream = null;
+
+            // Hide camera button if getUserMedia not available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                cameraBtn.hidden = true;
+            }
+
+            // ---- File Upload ----
+            fileInput.addEventListener("change", (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                onImageLoaded(file);
+                fileInput.value = "";
+            });
+
+            function onImageLoaded(source) {
+                placeholderMsg.hidden = true;
+                canvas.hidden = false;
+                controls.hidden = false;
+                results.hidden = false;
+                TLC.loadImage(source, canvas).then(() => {
+                    setChartSize();
+                    updateRfTable();
+                    updateChart();
+                });
+            }
+
+            // ---- Camera ----
+            cameraBtn.addEventListener("click", async () => {
+                try {
+                    cameraStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: "environment" }
+                    });
+                    video.srcObject = cameraStream;
+                    cameraContainer.hidden = false;
+                } catch (err) {
+                    alert("Camera access denied or unavailable. Please use file upload instead.");
+                }
+            });
+
+            captureBtn.addEventListener("click", () => {
+                if (!cameraStream) return;
+                placeholderMsg.hidden = true;
+                canvas.hidden = false;
+                controls.hidden = false;
+                results.hidden = false;
+                TLC.loadFromVideo(video, canvas).then(() => {
+                    stopCamera();
+                    setChartSize();
+                    updateRfTable();
+                    updateChart();
+                });
+            });
+
+            cancelCamera.addEventListener("click", stopCamera);
+
+            function stopCamera() {
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach((t) => t.stop());
+                    cameraStream = null;
+                }
+                video.srcObject = null;
+                cameraContainer.hidden = true;
+            }
+
+            // ---- Mode Buttons ----
+            modeButtons.forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const mode = btn.dataset.mode;
+                    if (TLC.interactionMode === mode) {
+                        TLC.interactionMode = "none";
+                        btn.classList.remove("active");
+                    } else {
+                        TLC.interactionMode = mode;
+                        modeButtons.forEach((b) => b.classList.remove("active"));
+                        btn.classList.add("active");
+                    }
+                });
+            });
+
+            document.getElementById("clear-all").addEventListener("click", () => {
+                TLC.resetState();
+                modeButtons.forEach((b) => b.classList.remove("active"));
+                document.getElementById("brightness-slider").value = 0;
+                document.getElementById("contrast-slider").value = 0;
+                document.getElementById("threshold-toggle").checked = false;
+                document.getElementById("threshold-slider").value = 128;
+                document.getElementById("threshold-row").hidden = true;
+                document.getElementById("brightness-val").textContent = "0";
+                document.getElementById("contrast-val").textContent = "0";
+                document.getElementById("threshold-val").textContent = "128";
+                TLC.redraw(canvas);
+                updateRfTable();
+                updateChart();
+            });
+
+            // ---- Canvas Click ----
+            canvas.addEventListener("click", (e) => {
+                if (!TLC.originalImageData) return;
+                const { x, y } = TLC.getCanvasCoords(canvas, e);
+
+                switch (TLC.interactionMode) {
+                    case "origin":
+                        TLC.originY = y;
+                        recalcAllRf();
+                        break;
+                    case "front":
+                        TLC.frontY = y;
+                        recalcAllRf();
+                        break;
+                    case "spot":
+                        const rf = (TLC.originY !== null && TLC.frontY !== null)
+                            ? TLC.calculateRf(TLC.originY, TLC.frontY, y)
+                            : null;
+                        TLC.spots.push({ x, y, rf });
+                        break;
+                    case "lane":
+                        TLC.laneX = x;
+                        TLC.laneWidth = parseInt(document.getElementById("lane-width").value) || 20;
+                        break;
+                    default:
+                        return;
+                }
+
+                TLC.redraw(canvas);
+                updateRfTable();
+                updateChart();
+            });
+
+            function recalcAllRf() {
+                TLC.spots.forEach((s) => {
+                    if (TLC.originY !== null && TLC.frontY !== null) {
+                        s.rf = TLC.calculateRf(TLC.originY, TLC.frontY, s.y);
+                    }
+                });
+            }
+
+            // ---- Sliders ----
+            const brightnessSlider = document.getElementById("brightness-slider");
+            const contrastSlider = document.getElementById("contrast-slider");
+            const thresholdToggle = document.getElementById("threshold-toggle");
+            const thresholdSlider = document.getElementById("threshold-slider");
+            const thresholdRow = document.getElementById("threshold-row");
+
+            brightnessSlider.addEventListener("input", () => {
+                TLC.brightness = parseInt(brightnessSlider.value);
+                document.getElementById("brightness-val").textContent = brightnessSlider.value;
+                TLC.redraw(canvas);
+                updateChart();
+            });
+
+            contrastSlider.addEventListener("input", () => {
+                TLC.contrast = parseInt(contrastSlider.value);
+                document.getElementById("contrast-val").textContent = contrastSlider.value;
+                TLC.redraw(canvas);
+                updateChart();
+            });
+
+            thresholdToggle.addEventListener("change", () => {
+                TLC.thresholdEnabled = thresholdToggle.checked;
+                thresholdRow.hidden = !thresholdToggle.checked;
+                TLC.redraw(canvas);
+                updateChart();
+            });
+
+            thresholdSlider.addEventListener("input", () => {
+                TLC.thresholdValue = parseInt(thresholdSlider.value);
+                document.getElementById("threshold-val").textContent = thresholdSlider.value;
+                TLC.redraw(canvas);
+                updateChart();
+            });
+
+            // ---- Rf Table ----
+            function updateRfTable() {
+                rfTbody.innerHTML = "";
+                if (TLC.spots.length === 0) {
+                    noSpotsMsg.hidden = false;
+                    return;
+                }
+                noSpotsMsg.hidden = true;
+                TLC.spots.forEach((s, i) => {
+                    const tr = document.createElement("tr");
+                    const td1 = document.createElement("td");
+                    td1.textContent = i + 1;
+                    const td2 = document.createElement("td");
+                    td2.textContent = s.rf != null ? s.rf.toFixed(3) : "—";
+                    tr.appendChild(td1);
+                    tr.appendChild(td2);
+                    rfTbody.appendChild(tr);
+                });
+            }
+
+            // ---- Intensity Chart ----
+            function setChartSize() {
+                const container = chartCanvas.parentElement;
+                chartCanvas.width = container.clientWidth - 2;
+                chartCanvas.height = 200;
+            }
+
+            function updateChart() {
+                if (TLC.laneX === null || TLC.originY === null || TLC.frontY === null) {
+                    noLaneMsg.hidden = !(TLC.laneX === null);
+                    TLC.drawIntensityChart(chartCanvas, [], TLC.spots);
+                    return;
+                }
+                noLaneMsg.hidden = true;
+                const lw = parseInt(document.getElementById("lane-width").value) || 20;
+                TLC.laneWidth = lw;
+                const profile = TLC.getIntensityProfile(
+                    canvas, TLC.laneX, lw, TLC.frontY, TLC.originY
+                );
+                TLC.drawIntensityChart(chartCanvas, profile, TLC.spots);
+            }
+
+            // Resize chart on window resize
+            window.addEventListener("resize", () => {
+                if (!TLC.originalImageData) return;
+                setChartSize();
+                updateChart();
+            });
+        })();
+    </script>
+</body>
+
+</html>
