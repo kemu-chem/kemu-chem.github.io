@@ -6,13 +6,13 @@
     "shift": "5.02"
   },
   {
-    "compound": "water",
+    "compound": "H2O",
     "proton": "OH",
     "multiplicity": "s",
     "shift": "2.13"
   },
   {
-    "compound": "acetic acid",
+    "compound": "AcOH",
     "proton": "CH3",
     "multiplicity": "s",
     "shift": "1.96"
@@ -24,7 +24,7 @@
     "shift": "2.08"
   },
   {
-    "compound": "acetonitrile",
+    "compound": "MeCN",
     "proton": "CH3",
     "multiplicity": "s",
     "shift": "1.96"
@@ -36,19 +36,19 @@
     "shift": "7.37"
   },
   {
-    "compound": "tert-butyl alcohol",
+    "compound": "t-BuOH",
     "proton": "CH3",
     "multiplicity": "s",
     "shift": "1.16"
   },
   {
-    "compound": "tert-butyl alcohol",
+    "compound": "t-BuOH",
     "proton": "OH",
     "multiplicity": "s",
     "shift": "2.18"
   },
   {
-    "compound": "chloroform",
+    "compound": "CHCl3",
     "proton": "CH",
     "multiplicity": "s",
     "shift": "7.58"
@@ -66,25 +66,25 @@
     "shift": "1.44"
   },
   {
-    "compound": "1,2-dichloroethane",
+    "compound": "1,2-DCE",
     "proton": "CH2",
     "multiplicity": "s",
     "shift": "3.81"
   },
   {
-    "compound": "dichloromethane",
+    "compound": "DCM",
     "proton": "CH2",
     "multiplicity": "s",
     "shift": "5.44"
   },
   {
-    "compound": "diethyl ether",
+    "compound": "Et2O",
     "proton": "CH3",
     "multiplicity": "t, 7",
     "shift": "1.12"
   },
   {
-    "compound": "diethyl ether",
+    "compound": "Et2O",
     "proton": "CH2",
     "multiplicity": "q, 7",
     "shift": "3.42"
@@ -108,19 +108,19 @@
     "shift": "3.29"
   },
   {
-    "compound": "dimethylformamide",
+    "compound": "DMF",
     "proton": "CH",
     "multiplicity": "s",
     "shift": "7.92"
   },
   {
-    "compound": "dimethylformamide",
+    "compound": "DMF",
     "proton": "CH3",
     "multiplicity": "s",
     "shift": "2.89"
   },
   {
-    "compound": "dimethylformamide",
+    "compound": "DMF",
     "proton": "CH3",
     "multiplicity": "s",
     "shift": "2.77"
@@ -150,37 +150,37 @@
     "shift": "0.85"
   },
   {
-    "compound": "ethanol",
+    "compound": "EtOH",
     "proton": "CH3",
     "multiplicity": "t, 7",
     "shift": "1.12"
   },
   {
-    "compound": "ethanol",
+    "compound": "EtOH",
     "proton": "CH2",
     "multiplicity": "q, 7",
     "shift": "3.54"
   },
   {
-    "compound": "ethanol",
+    "compound": "EtOH",
     "proton": "OH",
     "multiplicity": "s",
     "shift": "2.47"
   },
   {
-    "compound": "ethyl acetate",
+    "compound": "EtOAc",
     "proton": "CH3CO",
     "multiplicity": "s",
     "shift": "1.97"
   },
   {
-    "compound": "ethyl acetate",
+    "compound": "EtOAc",
     "proton": "CH2CH3",
     "multiplicity": "q, 7",
     "shift": "4.06"
   },
   {
-    "compound": "ethyl acetate",
+    "compound": "EtOAc",
     "proton": "CH2CH3",
     "multiplicity": "t, 7",
     "shift": "1.20"
@@ -228,7 +228,7 @@
     "shift": "2.57"
   },
   {
-    "compound": "hydrogen",
+    "compound": "H2",
     "proton": "H2",
     "multiplicity": "s",
     "shift": "4.57"
@@ -246,25 +246,25 @@
     "shift": "7.01"
   },
   {
-    "compound": "methane",
+    "compound": "CH4",
     "proton": "CH4",
     "multiplicity": "s",
     "shift": "0.20"
   },
   {
-    "compound": "methanol",
+    "compound": "MeOH",
     "proton": "CH3",
     "multiplicity": "s",
     "shift": "3.28"
   },
   {
-    "compound": "methanol",
+    "compound": "MeOH",
     "proton": "OH",
     "multiplicity": "s",
     "shift": "2.16"
   },
   {
-    "compound": "nitromethane",
+    "compound": "MeNO2",
     "proton": "CH3",
     "multiplicity": "s",
     "shift": "4.31"
@@ -372,13 +372,13 @@
     "shift": "0.08"
   },
   {
-    "compound": "tetrahydrofuran",
+    "compound": "THF",
     "proton": "CH2(2,5)",
     "multiplicity": "m",
     "shift": "3.64"
   },
   {
-    "compound": "tetrahydrofuran",
+    "compound": "THF",
     "proton": "CH2(3,4)",
     "multiplicity": "m",
     "shift": "1.80"

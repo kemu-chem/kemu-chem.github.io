@@ -109,6 +109,16 @@
             color: var(--pill-active-bg);
         }
 
+        .theme-toggle.active {
+            border-color: var(--pill-active-bg);
+            color: var(--pill-active-text);
+            background: var(--pill-active-bg);
+        }
+
+        .bold-label {
+            font-weight: bold;
+        }
+
         /* ===== Nucleus Tabs ===== */
         .nucleus-tabs {
             display: flex;
@@ -424,7 +434,11 @@
 
         <div class="header-row">
             <h1>NMR Impurity Finder</h1>
-            <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">&#9790;</button>
+            <div style="display: flex; gap: 8px;">
+                <button class="theme-toggle" id="highlightCommonToggle"
+                    title="Highlight common solvents">&#10024;</button>
+                <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">&#9790;</button>
+            </div>
         </div>
 
         <!-- Nucleus Tabs -->
@@ -485,7 +499,6 @@
         Deuterated Solvents Relevant to the Organometallic Chemist. <i>Organometallics</i> <b>2010</b>, 29 (9),
         2176&ndash;2179. https://doi.org/10.1021/om100106e.
     </footer>
-
     <script>
         (() => {
             'use strict';
@@ -544,6 +557,13 @@
                     fnmr: { label: '¹⁹F', dir: 'fnmr', min: -220, max: 0 },
                 };
 
+                const COMMON_IMPURITIES = new Set([
+                    'H2O', 'hexane', 'EtOAc', 'acetone', 'MeOH', 'EtOH',
+                    'Et2O', 'toluene', 'DCM', 'CHCl3', 'MeCN',
+                    'DMF', 'DMSO', 'benzene', 'pyridine', 'AcOH',
+                    'THF', '1,4-dioxane', 'Et3N', 'hmdso', 'hgrease', 'silicone grease'
+                ].map(s => s.toLowerCase()));
+
                 function sanitizeEntry(e) {
                     let { compound, proton, multiplicity, shift } = e;
 
@@ -582,6 +602,8 @@
                     // Detect solvent residual
                     const isSolventResidual = compound === 'Solvent Residual';
 
+                    const isCommon = COMMON_IMPURITIES.has(compound.toLowerCase());
+
                     return {
                         compound,
                         proton,
@@ -592,6 +614,7 @@
                         shiftMax: parsedShift.max,
                         isRange: parsedShift.min !== parsedShift.max,
                         isSolventResidual,
+                        isCommon,
                         id: `${compound}__${proton}__${shift}`
                     };
                 }
@@ -645,12 +668,36 @@
 
             function getCompoundColor(compound) {
                 if (compound === 'Solvent Residual') return 'var(--solvent-residual-color)';
-                if (compound === 'water') return '#60a5fa';
+                if (compound === 'water' || compound === 'H2O') return '#60a5fa';
                 let hash = 0;
                 for (let i = 0; i < compound.length; i++) {
                     hash = ((hash << 5) - hash + compound.charCodeAt(i)) | 0;
                 }
                 return PASTEL_COLORS[Math.abs(hash) % PASTEL_COLORS.length];
+            }
+
+            // ===== Multiplicity Helper =====
+            function getMultiplicityLines(multRaw, isSolvent) {
+                if (isSolvent || !multRaw) return [{ dx: 0, h: 1 }];
+                const str = multRaw.toLowerCase().replace(/\s+/g, '');
+                const match = str.match(/^[a-z]+/);
+                const m = match ? match[0] : 's';
+
+                switch (m) {
+                    case 'd': return [{ dx: -1.5, h: 1 }, { dx: 1.5, h: 1 }];
+                    case 't': return [{ dx: -3, h: 0.5 }, { dx: 0, h: 1 }, { dx: 3, h: 0.5 }];
+                    case 'q': return [{ dx: -4.5, h: 0.33 }, { dx: -1.5, h: 1 }, { dx: 1.5, h: 1 }, { dx: 4.5, h: 0.33 }];
+                    case 'quin':
+                    case 'quint': return [{ dx: -6, h: 0.16 }, { dx: -3, h: 0.66 }, { dx: 0, h: 1 }, { dx: 3, h: 0.66 }, { dx: 6, h: 0.16 }];
+                    case 'sext': return [{ dx: -7.5, h: 0.1 }, { dx: -4.5, h: 0.5 }, { dx: -1.5, h: 1 }, { dx: 1.5, h: 1 }, { dx: 4.5, h: 0.5 }, { dx: 7.5, h: 0.1 }];
+                    case 'sept': return [{ dx: -9, h: 0.05 }, { dx: -6, h: 0.3 }, { dx: -3, h: 0.75 }, { dx: 0, h: 1 }, { dx: 3, h: 0.75 }, { dx: 6, h: 0.3 }, { dx: 9, h: 0.05 }];
+                    case 'dd': return [{ dx: -3.5, h: 1 }, { dx: -1.5, h: 1 }, { dx: 1.5, h: 1 }, { dx: 3.5, h: 1 }];
+                    case 'brs': return [{ dx: -2, h: 0.6 }, { dx: -1, h: 0.9 }, { dx: 0, h: 1 }, { dx: 1, h: 0.9 }, { dx: 2, h: 0.6 }];
+                    case 'm':
+                    case 'dm':
+                    case 'dt': return [{ dx: -2.5, h: 0.6 }, { dx: -1.2, h: 0.9 }, { dx: 0, h: 1 }, { dx: 1.2, h: 0.9 }, { dx: 2.5, h: 0.6 }];
+                    default: return [{ dx: 0, h: 1 }];
+                }
             }
 
             // ===== NMRSpectrum =====
@@ -707,6 +754,12 @@
                     peakGroups.clear();
 
                     drawAxis();
+
+                    const linesLayer = createSVG('g', { class: 'lines-layer' });
+                    const labelsLayer = createSVG('g', { class: 'labels-layer' });
+                    svgEl.appendChild(linesLayer);
+                    svgEl.appendChild(labelsLayer);
+
                     if (entries.length === 0) return;
 
                     // Sort by shift for collision detection
@@ -743,8 +796,17 @@
                         // Label Y: tier 0 at bottom of label zone, higher tiers go up
                         const labelBottomY = labelZoneBottom - tier * slotHeight;
                         const labelTopY = labelBottomY - LABEL_H;
-                        drawPeak(entry, x, tier, animate, labelTopY, LABEL_H, LABEL_GAP);
+                        drawPeak(entry, x, tier, animate, labelTopY, LABEL_H, LABEL_GAP, linesLayer, labelsLayer);
                     });
+
+                    // Re-apply highlights automatically after rendering
+                    const searchInput = document.getElementById('searchInput');
+                    const highlightBtn = document.getElementById('highlightCommonToggle');
+                    if (searchInput && searchInput.value) {
+                        highlightSearch(searchInput.value);
+                    } else if (highlightBtn && highlightBtn.classList.contains('active')) {
+                        highlightCommon(true);
+                    }
                 }
 
                 function computeLabelPositions(sorted) {
@@ -851,26 +913,35 @@
                     svgEl.appendChild(g);
                 }
 
-                function drawPeak(entry, x, tier, animate, labelTopY, labelH, labelGap) {
-                    const g = createSVG('g', { class: 'peak-group', 'data-id': entry.id });
+                function drawPeak(entry, x, tier, animate, labelTopY, labelH, labelGap, linesLayer, labelsLayer) {
+                    const gLine = createSVG('g', { class: 'peak-group', 'data-id': entry.id });
+                    const gLabel = createSVG('g', { class: 'peak-group', 'data-id': entry.id });
                     const color = getCompoundColor(entry.compound);
                     const baseY = BASELINE_Y();
 
                     // Peak line: from baseline up to just below the label
                     const peakLineTop = labelTopY + labelH + labelGap;
+                    const peakHeight = baseY - peakLineTop;
                     const dashArray = entry.isSolventResidual ? '4,3' : 'none';
-                    const lineEl = createSVG('line', {
-                        x1: x, y1: baseY, x2: x, y2: peakLineTop,
-                        stroke: color, class: 'peak-line',
-                        'stroke-dasharray': dashArray
+
+                    getMultiplicityLines(entry.multiplicity, entry.isSolventResidual).forEach(spec => {
+                        const lineEl = createSVG('line', {
+                            x1: x + spec.dx,
+                            y1: baseY,
+                            x2: x + spec.dx,
+                            y2: baseY - peakHeight * spec.h,
+                            stroke: color,
+                            class: 'peak-line',
+                            'stroke-dasharray': dashArray
+                        });
+                        gLine.appendChild(lineEl);
                     });
-                    g.appendChild(lineEl);
 
                     // Range bar for range shifts
                     if (entry.isRange) {
                         const x1 = ppmToX(entry.shiftMax);
                         const x2 = ppmToX(entry.shiftMin);
-                        g.appendChild(createSVG('rect', {
+                        gLine.appendChild(createSVG('rect', {
                             x: Math.min(x1, x2), y: baseY - 4,
                             width: Math.abs(x2 - x1), height: 4,
                             fill: color, opacity: 0.4, rx: 2
@@ -885,20 +956,31 @@
                     const labelW = Math.max(labelLen * 5.5 + 12, 40);
                     const labelX = x - labelW / 2;
 
-                    g.appendChild(createSVG('rect', {
+                    const bgAttrs = {
                         x: labelX, y: labelTopY, width: labelW, height: labelH,
-                        fill: color, opacity: 0.15, class: 'peak-label-bg'
-                    }));
+                        fill: color, 'fill-opacity': 0.15, class: 'peak-label-bg'
+                    };
+
+                    if (entry.isCommon) {
+                        bgAttrs.stroke = color;
+                        bgAttrs['stroke-width'] = 1;
+                        bgAttrs['fill-opacity'] = 0.05; // Make the fill even lighter if it has a stroke
+                    } else {
+                        // Default logic from before: use inline css or attributes
+                        // if we want to mimic the old opacity: 0.15 behavior with pure attributes
+                    }
+
+                    gLabel.appendChild(createSVG('rect', bgAttrs));
 
                     const textEl = createSVG('text', {
                         x: x, y: labelTopY + 12,
                         'text-anchor': 'middle',
-                        class: 'peak-label-text'
+                        class: 'peak-label-text' + (entry.isCommon ? ' bold-label' : '')
                     });
                     textEl.innerHTML = entry.isSolventResidual
                         ? 'Solvent'
                         : NMRFormatter.toSVGTspans(entry.compound) + ' <tspan fill="var(--text-muted)">(' + NMRFormatter.toSVGTspans(entry.proton) + ')</tspan>';
-                    g.appendChild(textEl);
+                    gLabel.appendChild(textEl);
 
                     // Shift value at bottom
                     const shiftText = createSVG('text', {
@@ -908,26 +990,34 @@
                         transform: `rotate(-45, ${x}, ${baseY + 12})`
                     });
                     shiftText.textContent = entry.shift;
-                    g.appendChild(shiftText);
+                    gLabel.appendChild(shiftText);
 
-                    // Click handler — use 'click' so it doesn't interfere with pointer tracking
-                    g.style.cursor = 'pointer';
-                    g.addEventListener('click', (ev) => {
-                        ev.stopPropagation();
-                        showInfoCard(entry);
-                    });
+                    // Pointer tracking handles click logic now
+                    gLine.style.cursor = 'pointer';
+                    gLabel.style.cursor = 'pointer';
 
                     if (animate) {
-                        g.classList.add('entering');
+                        gLine.classList.add('entering');
+                        gLabel.classList.add('entering');
                         requestAnimationFrame(() => {
                             requestAnimationFrame(() => {
-                                g.classList.remove('entering');
+                                gLine.classList.remove('entering');
+                                gLabel.classList.remove('entering');
                             });
                         });
                     }
 
-                    peakGroups.set(entry.id, g);
-                    svgEl.appendChild(g);
+                    const fakeG = {
+                        classList: {
+                            add: (...cls) => { gLine.classList.add(...cls); gLabel.classList.add(...cls); },
+                            remove: (...cls) => { gLine.classList.remove(...cls); gLabel.classList.remove(...cls); },
+                            contains: (cls) => gLine.classList.contains(cls)
+                        }
+                    };
+
+                    peakGroups.set(entry.id, fakeG);
+                    linesLayer.appendChild(gLine);
+                    labelsLayer.appendChild(gLabel);
                 }
 
                 function zoom(factor) {
@@ -1003,6 +1093,33 @@
                     }
                 }
 
+                function highlightCommon(active) {
+                    peakGroups.forEach((g, id) => {
+                        g.classList.remove('dimmed', 'highlighted');
+                    });
+
+                    if (!active) return;
+
+                    let hasMatch = false;
+                    currentEntries.forEach(entry => {
+                        const g = peakGroups.get(entry.id);
+                        if (!g) return;
+
+                        if (entry.isCommon) {
+                            g.classList.add('highlighted');
+                            hasMatch = true;
+                        }
+                    });
+
+                    if (hasMatch) {
+                        peakGroups.forEach((g) => {
+                            if (!g.classList.contains('highlighted')) {
+                                g.classList.add('dimmed');
+                            }
+                        });
+                    }
+                }
+
                 function createSVG(tag, attrs = {}) {
                     const el = document.createElementNS(SVG_NS, tag);
                     for (const [k, v] of Object.entries(attrs)) {
@@ -1012,8 +1129,9 @@
                 }
 
                 return {
-                    init, setAxisRange, render, zoom, pan, resetView, highlightSearch, ppmToX, xToPpm,
-                    get viewMin() { return viewMin; }, get viewMax() { return viewMax; }
+                    init, setAxisRange, render, zoom, pan, resetView, highlightSearch, highlightCommon, ppmToX, xToPpm,
+                    get viewMin() { return viewMin; }, get viewMax() { return viewMax; },
+                    getEntryById: (id) => currentEntries.find(e => e.id === id)
                 };
             })();
 
@@ -1032,12 +1150,14 @@
                 let currentSolvent = 'cdcl3';
                 let currentNucleus = 'hnmr';
                 let searchTimeout = null;
+                let isHighlightCommonActive = false;
 
                 function init() {
                     buildSolventPills();
                     bindNucleusTabs();
                     bindSearch();
                     bindThemeToggle();
+                    bindHighlightCommonToggle();
                     bindZoom();
                     bindTouchGestures();
                     initTheme();
@@ -1090,7 +1210,11 @@
 
                     // Re-apply search if active
                     const q = document.getElementById('searchInput').value;
-                    if (q) NMRSpectrum.highlightSearch(q);
+                    if (q) {
+                        NMRSpectrum.highlightSearch(q);
+                    } else if (isHighlightCommonActive) {
+                        NMRSpectrum.highlightCommon(true);
+                    }
 
                     // Hide info card on solvent change
                     document.getElementById('infoCard').classList.remove('visible');
@@ -1113,8 +1237,28 @@
                     input.addEventListener('input', () => {
                         clearTimeout(searchTimeout);
                         searchTimeout = setTimeout(() => {
-                            NMRSpectrum.highlightSearch(input.value);
+                            if (input.value) {
+                                NMRSpectrum.highlightSearch(input.value);
+                            } else if (isHighlightCommonActive) {
+                                NMRSpectrum.highlightCommon(true);
+                            } else {
+                                NMRSpectrum.highlightSearch('');
+                            }
                         }, 150);
+                    });
+                }
+
+                function bindHighlightCommonToggle() {
+                    const btn = document.getElementById('highlightCommonToggle');
+                    btn.addEventListener('click', () => {
+                        isHighlightCommonActive = !isHighlightCommonActive;
+                        btn.classList.toggle('active', isHighlightCommonActive);
+
+                        // Give search precedence if it has text
+                        const q = document.getElementById('searchInput').value;
+                        if (!q) {
+                            NMRSpectrum.highlightCommon(isHighlightCommonActive);
+                        }
                     });
                 }
 
@@ -1163,12 +1307,16 @@
                     let pointers = new Map();
                     let lastPinchDist = null;
                     let lastPanX = null;
+                    let potentialClick = null;
 
                     container.addEventListener('pointerdown', (e) => {
                         pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
                         container.setPointerCapture(e.pointerId);
                         if (pointers.size === 1) {
                             lastPanX = e.clientX;
+                            potentialClick = { x: e.clientX, y: e.clientY, id: e.pointerId, target: e.target };
+                        } else {
+                            potentialClick = null;
                         }
                     });
 
@@ -1198,9 +1346,25 @@
                     });
 
                     const endPointer = (e) => {
+                        if (potentialClick && potentialClick.id === e.pointerId) {
+                            const dx = e.clientX - potentialClick.x;
+                            const dy = e.clientY - potentialClick.y;
+                            if (Math.hypot(dx, dy) < 5) {
+                                // It's a click!
+                                const group = potentialClick.target && potentialClick.target.closest ? potentialClick.target.closest('.peak-group') : null;
+                                if (group) {
+                                    const id = group.getAttribute('data-id');
+                                    const entry = NMRSpectrum.getEntryById(id);
+                                    if (entry) showInfoCard(entry);
+                                } else {
+                                    document.getElementById('infoCard').classList.remove('visible');
+                                }
+                            }
+                        }
                         pointers.delete(e.pointerId);
                         if (pointers.size < 2) lastPinchDist = null;
                         if (pointers.size === 0) lastPanX = null;
+                        potentialClick = null;
                     };
 
                     container.addEventListener('pointerup', endPointer);
@@ -1224,13 +1388,6 @@
                     document.getElementById('spectrumSvg')
                 );
                 NMRControls.init();
-
-                // Dismiss info card on outside click
-                document.getElementById('spectrumContainer').addEventListener('click', (e) => {
-                    if (!e.target.closest('.peak-group')) {
-                        document.getElementById('infoCard').classList.remove('visible');
-                    }
-                });
             });
         })();
     </script>
