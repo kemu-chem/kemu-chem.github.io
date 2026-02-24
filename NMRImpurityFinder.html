@@ -730,11 +730,12 @@
                     const labelZoneBottom = BASELINE_Y() - (BASELINE_Y() - MARGIN.top) * 0.2; // use top 80% of plot area
                     const labelZoneHeight = labelZoneBottom - labelZoneTop;
 
-                    // Each tier needs LABEL_H + LABEL_GAP, spread evenly within the zone
+                    // Each tier needs LABEL_H + LABEL_GAP, compress if too many tiers
                     // Tier 0 = lowest (closest to baseline), tier maxTier = highest (closest to top)
+                    const idealSlot = LABEL_H + LABEL_GAP + 8;
                     const slotHeight = maxTier > 0
-                        ? Math.min(LABEL_H + LABEL_GAP + 12, labelZoneHeight / (maxTier + 1))
-                        : LABEL_H + LABEL_GAP + 12;
+                        ? Math.min(idealSlot, labelZoneHeight / (maxTier + 1))
+                        : idealSlot;
 
                     visible.forEach((entry, i) => {
                         const x = ppmToX(entry.shiftMid);
@@ -750,43 +751,36 @@
                     const tiers = new Array(sorted.length).fill(0);
                     const positions = sorted.map(e => ppmToX(e.shiftMid));
 
-                    // Estimate each label's width based on text length
+                    // Estimate each label's width with generous padding
                     const labelWidths = sorted.map(e => {
                         const text = e.isSolventResidual
                             ? 'Solvent'
                             : `${e.compound} (${e.proton})`;
-                        return Math.max(text.length * 5.5 + 16, 44);
+                        return Math.max(text.length * 6 + 20, 48);
                     });
 
-                    // For each peak, find the lowest tier that doesn't overlap
-                    // with any previously placed label
-                    const MAX_TIERS = 6;
-                    // Track placed labels: array of {x, halfW, tier}
+                    // Unlimited tiers — always find a non-overlapping slot
                     const placed = [];
 
                     for (let i = 0; i < sorted.length; i++) {
                         const x = positions[i];
                         const halfW = labelWidths[i] / 2;
 
-                        // Try each tier from 0 upward
+                        // Try each tier from 0 upward until no conflict
                         let bestTier = 0;
-                        for (let t = 0; t < MAX_TIERS; t++) {
+                        while (true) {
                             let conflict = false;
                             for (let j = placed.length - 1; j >= 0; j--) {
                                 const p = placed[j];
-                                if (p.tier !== t) continue;
-                                const overlap = (halfW + p.halfW) - Math.abs(x - p.x);
+                                if (p.tier !== bestTier) continue;
+                                const overlap = (halfW + p.halfW + 4) - Math.abs(x - p.x);
                                 if (overlap > 0) {
                                     conflict = true;
                                     break;
                                 }
                             }
-                            if (!conflict) {
-                                bestTier = t;
-                                break;
-                            }
-                            // If all tiers conflict, use the highest
-                            if (t === MAX_TIERS - 1) bestTier = t;
+                            if (!conflict) break;
+                            bestTier++;
                         }
 
                         tiers[i] = bestTier;
@@ -916,8 +910,9 @@
                     shiftText.textContent = entry.shift;
                     g.appendChild(shiftText);
 
-                    // Click handler
-                    g.addEventListener('pointerup', (ev) => {
+                    // Click handler — use 'click' so it doesn't interfere with pointer tracking
+                    g.style.cursor = 'pointer';
+                    g.addEventListener('click', (ev) => {
                         ev.stopPropagation();
                         showInfoCard(entry);
                     });
@@ -1231,8 +1226,8 @@
                 NMRControls.init();
 
                 // Dismiss info card on outside click
-                document.getElementById('spectrumContainer').addEventListener('pointerup', (e) => {
-                    if (e.target === document.getElementById('spectrumSvg') || e.target.closest('.spectrum-container') && !e.target.closest('.peak-group')) {
+                document.getElementById('spectrumContainer').addEventListener('click', (e) => {
+                    if (!e.target.closest('.peak-group')) {
                         document.getElementById('infoCard').classList.remove('visible');
                     }
                 });
