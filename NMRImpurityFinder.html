@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9462795888369941"
+        crossorigin="anonymous"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NMR Impurity Finder</title>
+    <link rel="stylesheet" href="main_style.css">
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1PK2SJTJ75"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'G-1PK2SJTJ75');
+    </script>
+    <style>
+        /* ===== Theme Variables ===== */
+        :root {
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --text-dim: #94a3b8;
+            --border: #e2e8f0;
+            --axis-color: #475569;
+            --axis-tick: #94a3b8;
+            --peak-default: #64748b;
+            --search-bg: #f1f5f9;
+            --search-border: #cbd5e1;
+            --pill-bg: #f1f5f9;
+            --pill-active-bg: #2563eb;
+            --pill-active-text: #ffffff;
+            --pill-text: #475569;
+            --pill-hover: #e2e8f0;
+            --tooltip-bg: #1e293b;
+            --tooltip-text: #f8fafc;
+            --solvent-residual-color: #ef4444;
+            --highlight-glow: rgba(37, 99, 235, 0.3);
+            --svg-bg: #fafbfc;
+        }
+
+        [data-theme="dark"] {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --border: #334155;
+            --axis-color: #cbd5e1;
+            --axis-tick: #64748b;
+            --peak-default: #94a3b8;
+            --search-bg: #1e293b;
+            --search-border: #475569;
+            --pill-bg: #334155;
+            --pill-active-bg: #3b82f6;
+            --pill-active-text: #ffffff;
+            --pill-text: #cbd5e1;
+            --pill-hover: #475569;
+            --tooltip-bg: #f1f5f9;
+            --tooltip-text: #0f172a;
+            --solvent-residual-color: #f87171;
+            --highlight-glow: rgba(59, 130, 246, 0.4);
+            --svg-bg: #162032;
+        }
+
+        /* ===== Base ===== */
+        body {
+            background: var(--bg);
+            color: var(--text);
+            transition: background 0.3s, color 0.3s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .card {
+            background: var(--card-bg);
+            transition: background 0.3s;
+        }
+
+        /* ===== Header ===== */
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        h1 {
+            font-size: 1.5em;
+            margin: 0;
+            color: var(--text);
+        }
+
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 18px;
+            color: var(--text-muted);
+            transition: border-color 0.2s, color 0.2s;
+            line-height: 1;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--pill-active-bg);
+            color: var(--pill-active-bg);
+        }
+
+        /* ===== Nucleus Tabs ===== */
+        .nucleus-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+
+        .nucleus-tab {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--pill-bg);
+            color: var(--pill-text);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .nucleus-tab.active {
+            background: var(--pill-active-bg);
+            color: var(--pill-active-text);
+            border-color: var(--pill-active-bg);
+        }
+
+        .nucleus-tab.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            position: relative;
+        }
+
+        /* ===== Solvent Pills ===== */
+        .solvent-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            margin-bottom: 12px;
+            padding-bottom: 4px;
+            position: relative;
+            -ms-overflow-style: none;
+        }
+
+        .solvent-scroll::-webkit-scrollbar {
+            display: none;
+        }
+
+        .solvent-scroll-wrapper {
+            position: relative;
+        }
+
+        .solvent-scroll-wrapper::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 32px;
+            background: linear-gradient(to right, transparent, var(--card-bg));
+            pointer-events: none;
+            z-index: 1;
+            transition: opacity 0.3s;
+        }
+
+        .solvent-scroll-wrapper.scrolled-end::after {
+            opacity: 0;
+        }
+
+        .solvent-pills {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 6px;
+            width: max-content;
+            padding-right: 24px;
+        }
+
+        .solvent-pill {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--pill-bg);
+            color: var(--pill-text);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+            user-select: none;
+            -webkit-user-select: none;
+            flex-shrink: 0;
+        }
+
+        .solvent-pill:hover {
+            background: var(--pill-hover);
+        }
+
+        .solvent-pill.active {
+            background: var(--pill-active-bg);
+            color: var(--pill-active-text);
+            border-color: var(--pill-active-bg);
+        }
+
+        /* ===== Search ===== */
+        .search-container {
+            position: relative;
+            margin-bottom: 12px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 14px 10px 36px;
+            border: 1px solid var(--search-border);
+            border-radius: 8px;
+            background: var(--search-bg);
+            color: var(--text);
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--pill-active-bg);
+        }
+
+        .search-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-dim);
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        /* ===== Spectrum ===== */
+        .spectrum-container {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--svg-bg);
+            touch-action: none;
+            -webkit-touch-callout: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .spectrum-svg {
+            display: block;
+            width: 100%;
+        }
+
+        /* SVG text styling */
+        .spectrum-svg text {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .axis-label {
+            fill: var(--axis-color);
+            font-size: 11px;
+        }
+
+        .axis-unit {
+            fill: var(--text-muted);
+            font-size: 10px;
+            font-style: italic;
+        }
+
+        .peak-group {
+            cursor: pointer;
+        }
+
+        .peak-line {
+            stroke-width: 1.5;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+        }
+
+        .peak-label-bg {
+            rx: 4;
+            ry: 4;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+        }
+
+        .peak-label-text {
+            font-size: 9px;
+            fill: var(--text);
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+        }
+
+        .peak-shift-text {
+            font-size: 8px;
+            fill: var(--text-muted);
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+        }
+
+        .peak-group.dimmed {
+            opacity: 0.15;
+        }
+
+        .peak-group.highlighted .peak-line {
+            stroke-width: 2.5;
+            filter: drop-shadow(0 0 4px var(--highlight-glow));
+        }
+
+        .peak-group.entering {
+            opacity: 0;
+        }
+
+        /* ===== Info Card ===== */
+        .info-card {
+            display: none;
+            background: var(--tooltip-bg);
+            color: var(--tooltip-text);
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-top: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .info-card.visible {
+            display: block;
+        }
+
+        .info-card .compound-name {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+
+        .info-card .detail-row {
+            display: flex;
+            gap: 16px;
+        }
+
+        .info-card .detail-label {
+            color: var(--text-dim);
+            min-width: 80px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ===== Zoom Controls ===== */
+        .zoom-controls {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+            justify-content: flex-end;
+        }
+
+        .zoom-btn {
+            padding: 4px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--pill-bg);
+            color: var(--pill-text);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.15s;
+            user-select: none;
+        }
+
+        .zoom-btn:hover {
+            border-color: var(--pill-active-bg);
+            color: var(--pill-active-bg);
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.2em;
+            }
+
+            .solvent-pill {
+                padding: 5px 10px;
+                font-size: 12px;
+            }
+
+            .nucleus-tab {
+                padding: 5px 10px;
+                font-size: 12px;
+            }
+
+            .peak-label-text {
+                font-size: 8px;
+            }
+
+            .peak-shift-text {
+                font-size: 7px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <a href="index.html" class="portal-btn">&#8592; Portal</a>
+
+        <div class="header-row">
+            <h1>NMR Impurity Finder</h1>
+            <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">&#9790;</button>
+        </div>
+
+        <!-- Nucleus Tabs -->
+        <div class="nucleus-tabs" id="nucleusTabs">
+            <div class="nucleus-tab active" data-nucleus="hnmr"><sup>1</sup>H</div>
+            <div class="nucleus-tab disabled" data-nucleus="cnmr" title="Coming soon"><sup>13</sup>C</div>
+            <div class="nucleus-tab disabled" data-nucleus="fnmr" title="Coming soon"><sup>19</sup>F</div>
+        </div>
+
+        <!-- Solvent Selector -->
+        <div class="solvent-scroll-wrapper" id="solventScrollWrapper">
+            <div class="solvent-scroll" id="solventScroll">
+                <div class="solvent-pills" id="solventPills"></div>
+            </div>
+        </div>
+
+        <!-- Search -->
+        <div class="search-container">
+            <span class="search-icon">&#128269;</span>
+            <input type="text" class="search-input" id="searchInput"
+                placeholder="Search by shift (e.g. 2.17) or compound name...">
+        </div>
+
+        <!-- Spectrum -->
+        <div class="spectrum-container" id="spectrumContainer">
+            <svg class="spectrum-svg" id="spectrumSvg"></svg>
+        </div>
+
+        <!-- Zoom Controls -->
+        <div class="zoom-controls">
+            <button class="zoom-btn" id="zoomIn" title="Zoom in">+</button>
+            <button class="zoom-btn" id="zoomOut" title="Zoom out">&minus;</button>
+            <button class="zoom-btn" id="zoomReset" title="Reset zoom">Reset</button>
+        </div>
+
+        <!-- Info Card -->
+        <div class="info-card" id="infoCard">
+            <div class="compound-name" id="infoCompound"></div>
+            <div class="detail-row">
+                <span class="detail-label">Proton:</span>
+                <span id="infoProton"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Shift:</span>
+                <span id="infoShift"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Multiplicity:</span>
+                <span id="infoMult"></span>
+            </div>
+        </div>
+    </div>
+
+    <footer
+        style="text-align: center; margin-top: 30px; color: var(--text-dim); font-size: 0.75em; padding-bottom: 20px;">
+        Data: Fulmer, G. R.; Miller, A. J. M.; Sherden, N. H.; Gottlieb, H. E.; Nudelman, A.; Stoltz, B. M.; Bercaw, J.
+        E.; Goldberg, K. I. NMR Chemical Shifts of Trace Impurities: Common Laboratory Solvents, Organics, and Gases in
+        Deuterated Solvents Relevant to the Organometallic Chemist. <i>Organometallics</i> <b>2010</b>, 29 (9),
+        2176&ndash;2179. https://doi.org/10.1021/om100106e.
+    </footer>
+
+    <script>
+        (() => {
+            'use strict';
+
+            // ===== NMRFormatter =====
+            const NMRFormatter = {
+                // Convert "CH3", "H2O" etc. to HTML with subscripts
+                toHTML(text) {
+                    if (!text) return '';
+                    return text.replace(/([A-Za-z\)])(\d+)/g, '$1<sub>$2</sub>');
+                },
+                // Convert for SVG <text> using tspan
+                toSVGTspans(text) {
+                    if (!text) return text;
+                    const parts = [];
+                    let last = 0;
+                    const re = /([A-Za-z\)])(\d+)/g;
+                    let m;
+                    while ((m = re.exec(text)) !== null) {
+                        if (m.index > last) parts.push(text.slice(last, m.index));
+                        parts.push(m[1]);
+                        parts.push(`<tspan baseline-shift="sub" font-size="70%">${m[2]}</tspan>`);
+                        last = re.lastIndex;
+                    }
+                    if (last < text.length) parts.push(text.slice(last));
+                    return parts.join('');
+                },
+                // Plain text length estimate (without tags)
+                plainLength(text) {
+                    return text ? text.length : 0;
+                }
+            };
+
+            // ===== NMRData =====
+            const NMRData = (() => {
+                const cache = new Map();
+
+                const SOLVENTS = [
+                    { key: 'cdcl3', name: 'CDCl3' },
+                    { key: 'cd2cl2', name: 'CD2Cl2' },
+                    { key: 'cd32so', name: '(CD3)2SO' },
+                    { key: 'cd32co', name: '(CD3)2CO' },
+                    { key: 'cd3cn', name: 'CD3CN' },
+                    { key: 'cd3od', name: 'CD3OD' },
+                    { key: 'd2o', name: 'D2O' },
+                    { key: 'c6d6', name: 'C6D6' },
+                    { key: 'c6d5cl', name: 'C6D5Cl' },
+                    { key: 'thf-d8', name: 'THF-d8' },
+                    { key: 'toluene-d8', name: 'Toluene-d8' },
+                    { key: 'tfe-d3', name: 'TFE-d3' },
+                ];
+
+                const NUCLEI = {
+                    hnmr: { label: '¹H', dir: 'hnmr', min: -0.5, max: 12 },
+                    cnmr: { label: '¹³C', dir: 'cnmr', min: -10, max: 230 },
+                    fnmr: { label: '¹⁹F', dir: 'fnmr', min: -220, max: 0 },
+                };
+
+                function sanitizeEntry(e) {
+                    let { compound, proton, multiplicity, shift } = e;
+
+                    // Fix split compound names: "1" + "2-dichloroethane" → "1,2-dichloroethane"
+                    if (/^\d+$/.test(compound) && /^\d+-.+/.test(proton)) {
+                        const realCompound = compound + ',' + proton;
+                        const realProton = multiplicity;
+                        // multiplicity is lost in this case, set to ''
+                        compound = realCompound;
+                        proton = realProton;
+                        multiplicity = '';
+                    }
+
+                    // Fix split proton labels: "CH(2" + "5)" → "CH(2,5)"
+                    if (proton && proton.endsWith('(') === false && /\([\d]+$/.test(proton) && /^[\d]+\)/.test(multiplicity)) {
+                        proton = proton + ',' + multiplicity;
+                        multiplicity = '';
+                    }
+
+                    // Fix toluene-type: proton "CH(2", mult "4", shift "m" or "7.10"
+                    // When shift is not a valid number/range, try to recover
+                    if (proton && /\(\d+$/.test(proton) && /^\d+$/.test(multiplicity)) {
+                        proton = proton + ',' + multiplicity + ')';
+                        multiplicity = '';
+                    }
+
+                    // Validate shift - skip entries with non-numeric shifts
+                    const shiftValid = /^-?\d+\.?\d*(-\d+\.?\d*)?$/.test(shift);
+                    if (!shiftValid) {
+                        return null; // will be filtered out
+                    }
+
+                    // Parse shift
+                    const parsedShift = parseShift(shift);
+
+                    // Detect solvent residual
+                    const isSolventResidual = compound === 'Solvent Residual';
+
+                    return {
+                        compound,
+                        proton,
+                        multiplicity,
+                        shift,
+                        shiftMid: parsedShift.mid,
+                        shiftMin: parsedShift.min,
+                        shiftMax: parsedShift.max,
+                        isRange: parsedShift.min !== parsedShift.max,
+                        isSolventResidual,
+                        id: `${compound}__${proton}__${shift}`
+                    };
+                }
+
+                function parseShift(s) {
+                    if (s.includes('-') && !s.startsWith('-')) {
+                        // Range like "0.84-0.87"
+                        const [a, b] = s.split('-').map(Number);
+                        return { min: a, max: b, mid: (a + b) / 2 };
+                    }
+                    if (s.startsWith('-') && s.indexOf('-', 1) > 0) {
+                        // Negative range like "-0.10--0.06" (unlikely but safe)
+                        const idx = s.indexOf('-', 1);
+                        const a = Number(s.slice(0, idx));
+                        const b = Number(s.slice(idx + 1));
+                        return { min: Math.min(a, b), max: Math.max(a, b), mid: (a + b) / 2 };
+                    }
+                    const v = Number(s);
+                    return { min: v, max: v, mid: v };
+                }
+
+                async function loadSolvent(solventKey, nucleus = 'hnmr') {
+                    const cacheKey = `${nucleus}/${solventKey}`;
+                    if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+                    const dir = NUCLEI[nucleus]?.dir || nucleus;
+                    const url = `data/json/${dir}/${solventKey}.json`;
+                    try {
+                        const resp = await fetch(url);
+                        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                        const raw = await resp.json();
+                        const entries = raw.map(sanitizeEntry).filter(Boolean);
+                        cache.set(cacheKey, entries);
+                        return entries;
+                    } catch (err) {
+                        console.error(`Failed to load ${url}:`, err);
+                        return [];
+                    }
+                }
+
+                return { SOLVENTS, NUCLEI, loadSolvent };
+            })();
+
+            // ===== Color Palette =====
+            const PASTEL_COLORS = [
+                '#93c5fd', '#86efac', '#fca5a5', '#fcd34d', '#c4b5fd',
+                '#f9a8d4', '#67e8f9', '#fdba74', '#a5b4fc', '#6ee7b7',
+                '#fda4af', '#bef264', '#e879f9', '#22d3ee', '#fb923c',
+                '#a78bfa', '#34d399', '#f472b6', '#38bdf8', '#facc15',
+            ];
+
+            function getCompoundColor(compound) {
+                if (compound === 'Solvent Residual') return 'var(--solvent-residual-color)';
+                if (compound === 'water') return '#60a5fa';
+                let hash = 0;
+                for (let i = 0; i < compound.length; i++) {
+                    hash = ((hash << 5) - hash + compound.charCodeAt(i)) | 0;
+                }
+                return PASTEL_COLORS[Math.abs(hash) % PASTEL_COLORS.length];
+            }
+
+            // ===== NMRSpectrum =====
+            const NMRSpectrum = (() => {
+                const SVG_NS = 'http://www.w3.org/2000/svg';
+                const MARGIN = { top: 20, right: 30, bottom: 40, left: 15 };
+                let svgEl, containerEl;
+                let svgWidth = 860, svgHeight = 380;
+                let currentEntries = [];
+                let viewMin, viewMax; // ppm range currently visible
+                let defaultMin, defaultMax;
+                let peakGroups = new Map(); // id → svg <g>
+
+                function init(container, svg) {
+                    containerEl = container;
+                    svgEl = svg;
+                    resize();
+                    window.addEventListener('resize', () => { resize(); render(currentEntries, false); });
+                }
+
+                function resize() {
+                    const rect = containerEl.getBoundingClientRect();
+                    svgWidth = Math.max(rect.width, 300);
+                    svgHeight = Math.min(Math.max(svgWidth * 0.5, 320), 500);
+                    svgEl.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
+                    svgEl.style.height = svgHeight + 'px';
+                }
+
+                function setAxisRange(min, max) {
+                    defaultMin = min;
+                    defaultMax = max;
+                    viewMin = min;
+                    viewMax = max;
+                }
+
+                // Convert ppm to x-pixel (reversed: high ppm = left)
+                function ppmToX(ppm) {
+                    const plotWidth = svgWidth - MARGIN.left - MARGIN.right;
+                    // viewMax is on the left, viewMin is on the right
+                    return MARGIN.left + plotWidth * (1 - (ppm - viewMin) / (viewMax - viewMin));
+                }
+
+                function xToPpm(x) {
+                    const plotWidth = svgWidth - MARGIN.left - MARGIN.right;
+                    return viewMin + (1 - (x - MARGIN.left) / plotWidth) * (viewMax - viewMin);
+                }
+
+                const BASELINE_Y = () => svgHeight - MARGIN.bottom;
+                const PLOT_TOP = () => MARGIN.top + 10;
+
+                function render(entries, animate = true) {
+                    currentEntries = entries;
+                    svgEl.innerHTML = '';
+                    peakGroups.clear();
+
+                    drawAxis();
+                    if (entries.length === 0) return;
+
+                    // Sort by shift for collision detection
+                    const sorted = [...entries].sort((a, b) => a.shiftMid - b.shiftMid);
+
+                    // Only include visible peaks
+                    const visible = sorted.filter(entry => {
+                        const x = ppmToX(entry.shiftMid);
+                        return x >= MARGIN.left - 20 && x <= svgWidth - MARGIN.right + 20;
+                    });
+
+                    // Collision detection on visible peaks only
+                    const labelPositions = computeLabelPositions(visible);
+                    const maxTier = Math.max(0, ...labelPositions);
+
+                    // Label-first layout: divide vertical space into tier slots
+                    // Labels are placed from top down, peak lines extend from baseline up to label
+                    const LABEL_H = 16;
+                    const LABEL_GAP = 4;       // gap between label bottom and peak line top
+                    const labelZoneTop = MARGIN.top + 4;
+                    const labelZoneBottom = BASELINE_Y() - (BASELINE_Y() - MARGIN.top) * 0.2; // use top 80% of plot area
+                    const labelZoneHeight = labelZoneBottom - labelZoneTop;
+
+                    // Each tier needs LABEL_H + LABEL_GAP, spread evenly within the zone
+                    // Tier 0 = lowest (closest to baseline), tier maxTier = highest (closest to top)
+                    const slotHeight = maxTier > 0
+                        ? Math.min(LABEL_H + LABEL_GAP + 12, labelZoneHeight / (maxTier + 1))
+                        : LABEL_H + LABEL_GAP + 12;
+
+                    visible.forEach((entry, i) => {
+                        const x = ppmToX(entry.shiftMid);
+                        const tier = labelPositions[i];
+                        // Label Y: tier 0 at bottom of label zone, higher tiers go up
+                        const labelBottomY = labelZoneBottom - tier * slotHeight;
+                        const labelTopY = labelBottomY - LABEL_H;
+                        drawPeak(entry, x, tier, animate, labelTopY, LABEL_H, LABEL_GAP);
+                    });
+                }
+
+                function computeLabelPositions(sorted) {
+                    const tiers = new Array(sorted.length).fill(0);
+                    const positions = sorted.map(e => ppmToX(e.shiftMid));
+
+                    // Estimate each label's width based on text length
+                    const labelWidths = sorted.map(e => {
+                        const text = e.isSolventResidual
+                            ? 'Solvent'
+                            : `${e.compound} (${e.proton})`;
+                        return Math.max(text.length * 5.5 + 16, 44);
+                    });
+
+                    // For each peak, find the lowest tier that doesn't overlap
+                    // with any previously placed label
+                    const MAX_TIERS = 6;
+                    // Track placed labels: array of {x, halfW, tier}
+                    const placed = [];
+
+                    for (let i = 0; i < sorted.length; i++) {
+                        const x = positions[i];
+                        const halfW = labelWidths[i] / 2;
+
+                        // Try each tier from 0 upward
+                        let bestTier = 0;
+                        for (let t = 0; t < MAX_TIERS; t++) {
+                            let conflict = false;
+                            for (let j = placed.length - 1; j >= 0; j--) {
+                                const p = placed[j];
+                                if (p.tier !== t) continue;
+                                const overlap = (halfW + p.halfW) - Math.abs(x - p.x);
+                                if (overlap > 0) {
+                                    conflict = true;
+                                    break;
+                                }
+                            }
+                            if (!conflict) {
+                                bestTier = t;
+                                break;
+                            }
+                            // If all tiers conflict, use the highest
+                            if (t === MAX_TIERS - 1) bestTier = t;
+                        }
+
+                        tiers[i] = bestTier;
+                        placed.push({ x, halfW, tier: bestTier });
+                    }
+                    return tiers;
+                }
+
+                function drawAxis() {
+                    const g = createSVG('g');
+                    const y = BASELINE_Y();
+                    const plotLeft = MARGIN.left;
+                    const plotRight = svgWidth - MARGIN.right;
+
+                    // Baseline
+                    const line = createSVG('line', {
+                        x1: plotLeft, y1: y, x2: plotRight, y2: y,
+                        stroke: 'var(--axis-color)', 'stroke-width': 1
+                    });
+                    g.appendChild(line);
+
+                    // Ticks
+                    const range = viewMax - viewMin;
+                    let majorStep = 1;
+                    if (range > 50) majorStep = 10;
+                    else if (range > 20) majorStep = 5;
+                    else if (range > 10) majorStep = 2;
+
+                    const start = Math.ceil(viewMin / majorStep) * majorStep;
+                    for (let ppm = start; ppm <= viewMax; ppm += majorStep) {
+                        const x = ppmToX(ppm);
+                        if (x < plotLeft || x > plotRight) continue;
+                        // Major tick
+                        g.appendChild(createSVG('line', {
+                            x1: x, y1: y, x2: x, y2: y + 8,
+                            stroke: 'var(--axis-color)', 'stroke-width': 1
+                        }));
+                        // Label
+                        const label = createSVG('text', {
+                            x: x, y: y + 22,
+                            'text-anchor': 'middle',
+                            class: 'axis-label'
+                        });
+                        label.textContent = ppm.toFixed(ppm === Math.round(ppm) ? 0 : 1);
+                        g.appendChild(label);
+
+                        // Minor ticks (half steps)
+                        const halfPpm = ppm + majorStep / 2;
+                        if (halfPpm <= viewMax) {
+                            const hx = ppmToX(halfPpm);
+                            if (hx >= plotLeft && hx <= plotRight) {
+                                g.appendChild(createSVG('line', {
+                                    x1: hx, y1: y, x2: hx, y2: y + 4,
+                                    stroke: 'var(--axis-tick)', 'stroke-width': 0.5
+                                }));
+                            }
+                        }
+                    }
+
+                    // ppm unit label
+                    const unitLabel = createSVG('text', {
+                        x: plotRight + 5, y: y + 5,
+                        class: 'axis-unit', 'text-anchor': 'start'
+                    });
+                    unitLabel.textContent = 'ppm';
+                    g.appendChild(unitLabel);
+
+                    svgEl.appendChild(g);
+                }
+
+                function drawPeak(entry, x, tier, animate, labelTopY, labelH, labelGap) {
+                    const g = createSVG('g', { class: 'peak-group', 'data-id': entry.id });
+                    const color = getCompoundColor(entry.compound);
+                    const baseY = BASELINE_Y();
+
+                    // Peak line: from baseline up to just below the label
+                    const peakLineTop = labelTopY + labelH + labelGap;
+                    const dashArray = entry.isSolventResidual ? '4,3' : 'none';
+                    const lineEl = createSVG('line', {
+                        x1: x, y1: baseY, x2: x, y2: peakLineTop,
+                        stroke: color, class: 'peak-line',
+                        'stroke-dasharray': dashArray
+                    });
+                    g.appendChild(lineEl);
+
+                    // Range bar for range shifts
+                    if (entry.isRange) {
+                        const x1 = ppmToX(entry.shiftMax);
+                        const x2 = ppmToX(entry.shiftMin);
+                        g.appendChild(createSVG('rect', {
+                            x: Math.min(x1, x2), y: baseY - 4,
+                            width: Math.abs(x2 - x1), height: 4,
+                            fill: color, opacity: 0.4, rx: 2
+                        }));
+                    }
+
+                    // Label background + text (positioned above the peak line)
+                    const labelText = entry.isSolventResidual
+                        ? 'Solvent'
+                        : `${entry.compound} (${entry.proton})`;
+                    const labelLen = NMRFormatter.plainLength(labelText);
+                    const labelW = Math.max(labelLen * 5.5 + 12, 40);
+                    const labelX = x - labelW / 2;
+
+                    g.appendChild(createSVG('rect', {
+                        x: labelX, y: labelTopY, width: labelW, height: labelH,
+                        fill: color, opacity: 0.15, class: 'peak-label-bg'
+                    }));
+
+                    const textEl = createSVG('text', {
+                        x: x, y: labelTopY + 12,
+                        'text-anchor': 'middle',
+                        class: 'peak-label-text'
+                    });
+                    textEl.innerHTML = entry.isSolventResidual
+                        ? 'Solvent'
+                        : NMRFormatter.toSVGTspans(entry.compound) + ' <tspan fill="var(--text-muted)">(' + NMRFormatter.toSVGTspans(entry.proton) + ')</tspan>';
+                    g.appendChild(textEl);
+
+                    // Shift value at bottom
+                    const shiftText = createSVG('text', {
+                        x: x, y: baseY + 12,
+                        'text-anchor': 'middle',
+                        class: 'peak-shift-text',
+                        transform: `rotate(-45, ${x}, ${baseY + 12})`
+                    });
+                    shiftText.textContent = entry.shift;
+                    g.appendChild(shiftText);
+
+                    // Click handler
+                    g.addEventListener('pointerup', (ev) => {
+                        ev.stopPropagation();
+                        showInfoCard(entry);
+                    });
+
+                    if (animate) {
+                        g.classList.add('entering');
+                        requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                                g.classList.remove('entering');
+                            });
+                        });
+                    }
+
+                    peakGroups.set(entry.id, g);
+                    svgEl.appendChild(g);
+                }
+
+                function zoom(factor) {
+                    const center = (viewMin + viewMax) / 2;
+                    const halfRange = (viewMax - viewMin) / 2 * factor;
+                    const newMin = center - halfRange;
+                    const newMax = center + halfRange;
+                    // Clamp
+                    viewMin = Math.max(newMin, defaultMin - 2);
+                    viewMax = Math.min(newMax, defaultMax + 2);
+                    if (viewMax - viewMin < 1) {
+                        viewMin = center - 0.5;
+                        viewMax = center + 0.5;
+                    }
+                    render(currentEntries, false);
+                }
+
+                function pan(deltaPpm) {
+                    const range = viewMax - viewMin;
+                    viewMin += deltaPpm;
+                    viewMax += deltaPpm;
+                    // Clamp
+                    if (viewMin < defaultMin - 2) { viewMin = defaultMin - 2; viewMax = viewMin + range; }
+                    if (viewMax > defaultMax + 2) { viewMax = defaultMax + 2; viewMin = viewMax - range; }
+                    render(currentEntries, false);
+                }
+
+                function resetView() {
+                    viewMin = defaultMin;
+                    viewMax = defaultMax;
+                    render(currentEntries, false);
+                }
+
+                function highlightSearch(query) {
+                    peakGroups.forEach((g, id) => {
+                        g.classList.remove('dimmed', 'highlighted');
+                    });
+
+                    if (!query || query.trim() === '') return;
+
+                    const q = query.trim().toLowerCase();
+                    const isNumeric = /^-?\d+\.?\d*$/.test(q);
+                    const numVal = isNumeric ? parseFloat(q) : null;
+                    const tolerance = 0.05;
+
+                    let hasMatch = false;
+                    currentEntries.forEach(entry => {
+                        const g = peakGroups.get(entry.id);
+                        if (!g) return;
+
+                        let match = false;
+                        if (isNumeric && numVal !== null) {
+                            match = Math.abs(entry.shiftMid - numVal) <= tolerance
+                                || (entry.isRange && numVal >= entry.shiftMin - tolerance && numVal <= entry.shiftMax + tolerance);
+                        }
+                        if (!match) {
+                            match = entry.compound.toLowerCase().includes(q)
+                                || (entry.proton && entry.proton.toLowerCase().includes(q));
+                        }
+
+                        if (match) {
+                            g.classList.add('highlighted');
+                            hasMatch = true;
+                        }
+                    });
+
+                    if (hasMatch) {
+                        peakGroups.forEach((g) => {
+                            if (!g.classList.contains('highlighted')) {
+                                g.classList.add('dimmed');
+                            }
+                        });
+                    }
+                }
+
+                function createSVG(tag, attrs = {}) {
+                    const el = document.createElementNS(SVG_NS, tag);
+                    for (const [k, v] of Object.entries(attrs)) {
+                        el.setAttribute(k, v);
+                    }
+                    return el;
+                }
+
+                return {
+                    init, setAxisRange, render, zoom, pan, resetView, highlightSearch, ppmToX, xToPpm,
+                    get viewMin() { return viewMin; }, get viewMax() { return viewMax; }
+                };
+            })();
+
+            // ===== Info Card =====
+            function showInfoCard(entry) {
+                const card = document.getElementById('infoCard');
+                document.getElementById('infoCompound').innerHTML = NMRFormatter.toHTML(entry.compound);
+                document.getElementById('infoProton').innerHTML = NMRFormatter.toHTML(entry.proton || '—');
+                document.getElementById('infoShift').textContent = entry.shift + ' ppm';
+                document.getElementById('infoMult').textContent = entry.multiplicity || '—';
+                card.classList.add('visible');
+            }
+
+            // ===== NMRControls =====
+            const NMRControls = (() => {
+                let currentSolvent = 'cdcl3';
+                let currentNucleus = 'hnmr';
+                let searchTimeout = null;
+
+                function init() {
+                    buildSolventPills();
+                    bindNucleusTabs();
+                    bindSearch();
+                    bindThemeToggle();
+                    bindZoom();
+                    bindTouchGestures();
+                    initTheme();
+
+                    // Load default solvent
+                    loadAndRender(currentSolvent);
+                }
+
+                function buildSolventPills() {
+                    const container = document.getElementById('solventPills');
+                    const scrollEl = document.getElementById('solventScroll');
+                    const wrapper = document.getElementById('solventScrollWrapper');
+
+                    NMRData.SOLVENTS.forEach(s => {
+                        const pill = document.createElement('div');
+                        pill.className = 'solvent-pill' + (s.key === currentSolvent ? ' active' : '');
+                        pill.dataset.key = s.key;
+                        pill.innerHTML = NMRFormatter.toHTML(s.name);
+                        pill.addEventListener('click', () => selectSolvent(s.key));
+                        container.appendChild(pill);
+                    });
+
+                    // Detect scroll end to hide fade gradient
+                    function checkScrollEnd() {
+                        const atEnd = scrollEl.scrollLeft + scrollEl.clientWidth >= scrollEl.scrollWidth - 8;
+                        wrapper.classList.toggle('scrolled-end', atEnd);
+                    }
+                    scrollEl.addEventListener('scroll', checkScrollEnd, { passive: true });
+                    // Initial check after layout
+                    requestAnimationFrame(checkScrollEnd);
+                }
+
+                function selectSolvent(key) {
+                    if (key === currentSolvent) return;
+                    currentSolvent = key;
+
+                    // Update pill styling
+                    document.querySelectorAll('.solvent-pill').forEach(p => {
+                        p.classList.toggle('active', p.dataset.key === key);
+                    });
+
+                    loadAndRender(key);
+                }
+
+                async function loadAndRender(solventKey) {
+                    const entries = await NMRData.loadSolvent(solventKey, currentNucleus);
+                    const nucleus = NMRData.NUCLEI[currentNucleus];
+                    NMRSpectrum.setAxisRange(nucleus.min, nucleus.max);
+                    NMRSpectrum.render(entries, true);
+
+                    // Re-apply search if active
+                    const q = document.getElementById('searchInput').value;
+                    if (q) NMRSpectrum.highlightSearch(q);
+
+                    // Hide info card on solvent change
+                    document.getElementById('infoCard').classList.remove('visible');
+                }
+
+                function bindNucleusTabs() {
+                    document.querySelectorAll('.nucleus-tab').forEach(tab => {
+                        tab.addEventListener('click', () => {
+                            if (tab.classList.contains('disabled')) return;
+                            document.querySelectorAll('.nucleus-tab').forEach(t => t.classList.remove('active'));
+                            tab.classList.add('active');
+                            currentNucleus = tab.dataset.nucleus;
+                            loadAndRender(currentSolvent);
+                        });
+                    });
+                }
+
+                function bindSearch() {
+                    const input = document.getElementById('searchInput');
+                    input.addEventListener('input', () => {
+                        clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(() => {
+                            NMRSpectrum.highlightSearch(input.value);
+                        }, 150);
+                    });
+                }
+
+                function bindThemeToggle() {
+                    document.getElementById('themeToggle').addEventListener('click', () => {
+                        const html = document.documentElement;
+                        const current = html.getAttribute('data-theme');
+                        const next = current === 'dark' ? 'light' : 'dark';
+                        html.setAttribute('data-theme', next);
+                        localStorage.setItem('nmr-theme', next);
+                        updateThemeIcon(next);
+                    });
+                }
+
+                function initTheme() {
+                    const saved = localStorage.getItem('nmr-theme');
+                    if (saved) {
+                        document.documentElement.setAttribute('data-theme', saved);
+                        updateThemeIcon(saved);
+                    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                        document.documentElement.setAttribute('data-theme', 'dark');
+                        updateThemeIcon('dark');
+                    }
+
+                    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                        if (!localStorage.getItem('nmr-theme')) {
+                            const t = e.matches ? 'dark' : 'light';
+                            document.documentElement.setAttribute('data-theme', t);
+                            updateThemeIcon(t);
+                        }
+                    });
+                }
+
+                function updateThemeIcon(theme) {
+                    document.getElementById('themeToggle').innerHTML = theme === 'dark' ? '&#9788;' : '&#9790;';
+                }
+
+                function bindZoom() {
+                    document.getElementById('zoomIn').addEventListener('click', () => NMRSpectrum.zoom(0.7));
+                    document.getElementById('zoomOut').addEventListener('click', () => NMRSpectrum.zoom(1.4));
+                    document.getElementById('zoomReset').addEventListener('click', () => NMRSpectrum.resetView());
+                }
+
+                function bindTouchGestures() {
+                    const container = document.getElementById('spectrumContainer');
+                    let pointers = new Map();
+                    let lastPinchDist = null;
+                    let lastPanX = null;
+
+                    container.addEventListener('pointerdown', (e) => {
+                        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                        container.setPointerCapture(e.pointerId);
+                        if (pointers.size === 1) {
+                            lastPanX = e.clientX;
+                        }
+                    });
+
+                    container.addEventListener('pointermove', (e) => {
+                        if (!pointers.has(e.pointerId)) return;
+                        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+                        if (pointers.size === 2) {
+                            // Pinch zoom
+                            const pts = [...pointers.values()];
+                            const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+                            if (lastPinchDist !== null) {
+                                const scale = lastPinchDist / dist;
+                                NMRSpectrum.zoom(scale);
+                            }
+                            lastPinchDist = dist;
+                            lastPanX = null;
+                        } else if (pointers.size === 1 && lastPanX !== null) {
+                            // Pan
+                            const dx = e.clientX - lastPanX;
+                            const rect = container.getBoundingClientRect();
+                            const ppmPerPx = (NMRSpectrum.viewMax - NMRSpectrum.viewMin) / rect.width;
+                            // Reversed axis: drag right → shift increases (move left in ppm)
+                            NMRSpectrum.pan(dx * ppmPerPx);
+                            lastPanX = e.clientX;
+                        }
+                    });
+
+                    const endPointer = (e) => {
+                        pointers.delete(e.pointerId);
+                        if (pointers.size < 2) lastPinchDist = null;
+                        if (pointers.size === 0) lastPanX = null;
+                    };
+
+                    container.addEventListener('pointerup', endPointer);
+                    container.addEventListener('pointercancel', endPointer);
+
+                    // Mouse wheel zoom
+                    container.addEventListener('wheel', (e) => {
+                        e.preventDefault();
+                        const factor = e.deltaY > 0 ? 1.15 : 0.87;
+                        NMRSpectrum.zoom(factor);
+                    }, { passive: false });
+                }
+
+                return { init };
+            })();
+
+            // ===== Boot =====
+            document.addEventListener('DOMContentLoaded', () => {
+                NMRSpectrum.init(
+                    document.getElementById('spectrumContainer'),
+                    document.getElementById('spectrumSvg')
+                );
+                NMRControls.init();
+
+                // Dismiss info card on outside click
+                document.getElementById('spectrumContainer').addEventListener('pointerup', (e) => {
+                    if (e.target === document.getElementById('spectrumSvg') || e.target.closest('.spectrum-container') && !e.target.closest('.peak-group')) {
+                        document.getElementById('infoCard').classList.remove('visible');
+                    }
+                });
+            });
+        })();
+    </script>
+</body>
+
+</html>

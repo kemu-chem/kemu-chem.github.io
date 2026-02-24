@@ -12,3 +12,9 @@ sample.bib
 sample.ris
 sample.txt
 CLAUDE.md
+tools/
+extract_tables.py
+generate_json.py
+data/extracted_csv/
+data/nmr-data.csv
+.overview
