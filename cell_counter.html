@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9462795888369941"
+     crossorigin="anonymous"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cell Counter</title>
+    <link rel="stylesheet" href="main_style.css">
+    <style>
+        h1 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .subtitle {
+            color: #777;
+            margin-bottom: 20px;
+        }
+
+        /* Input section */
+        .input-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .input-section button {
+            padding: 10px 20px;
+            border: 1px solid var(--primary);
+            background: var(--primary);
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .input-section button:hover { opacity: 0.9; }
+        .input-section button:disabled {
+            background: #94a3b8;
+            border-color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        #cv-status {
+            font-size: 13px;
+            color: #94a3b8;
+        }
+        #cv-status.ready { color: #16a34a; font-weight: bold; }
+        #cv-status.error { color: #dc2626; }
+
+        /* Canvas area */
+        .canvas-area {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .canvas-panel {
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .canvas-panel-label {
+            font-size: 13px;
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 4px;
+        }
+
+        .canvas-panel canvas {
+            max-width: 100%;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            display: block;
+        }
+
+        .no-image-msg {
+            color: #94a3b8;
+            padding: 60px 20px;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        /* View toggle buttons */
+        .view-toggle {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .view-btn {
+            padding: 5px 12px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .view-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Controls */
+        .controls {
+            margin-bottom: 20px;
+        }
+
+        .controls h3 {
+            margin: 0 0 12px;
+            color: #333;
+            font-size: 1em;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .slider-row label {
+            width: 110px;
+            font-size: 13px;
+            color: #555;
+            flex-shrink: 0;
+        }
+
+        .slider-row input[type="range"] { flex: 1; }
+
+        .slider-val {
+            width: 48px;
+            text-align: right;
+            font-size: 13px;
+            font-weight: bold;
+            color: #444;
+            flex-shrink: 0;
+        }
+
+        .check-row {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .check-row label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
+            color: #555;
+            cursor: pointer;
+        }
+
+        .area-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .area-row label {
+            width: 110px;
+            font-size: 13px;
+            color: #555;
+            flex-shrink: 0;
+        }
+
+        .area-row input[type="number"] {
+            width: 90px;
+            padding: 4px 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .section-divider {
+            border: none;
+            border-top: 1px solid #e2e8f0;
+            margin: 14px 0;
+        }
+
+        /* Result */
+        .result-box {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            border-radius: 8px;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .result-count {
+            font-size: 3em;
+            font-weight: bold;
+            color: #16a34a;
+            line-height: 1;
+            min-width: 2ch;
+            text-align: right;
+        }
+
+        .result-label {
+            font-size: 15px;
+            color: #555;
+        }
+
+        .result-note {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+
+        /* Footer */
+        .page-footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #aaa;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-10LFVJ13WS"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-10LFVJ13WS');
+</script>
+
+<body>
+    <div class="card">
+        <h1>Cell Counter</h1>
+        <p class="subtitle">Automatic cell counting from microscopy images using OpenCV.js</p>
+
+        <!-- Image input -->
+        <div class="input-section">
+            <button id="load-btn" disabled onclick="document.getElementById('file-input').click()">Load Image</button>
+            <input type="file" id="file-input" accept="image/*" hidden>
+            <span id="cv-status">Loading OpenCV.js...</span>
+        </div>
+
+        <!-- Drop zone -->
+        <div id="drop_zone">Drop image here, or click "Load Image"</div>
+
+        <!-- No image placeholder -->
+        <div class="no-image-msg" id="no-image-msg" hidden>
+            No image loaded yet. Drop an image or click the button above.
+        </div>
+
+        <!-- Canvases -->
+        <div class="canvas-area" id="canvas-area" hidden>
+            <div class="canvas-panel">
+                <div class="canvas-panel-label">Original</div>
+                <canvas id="canvas-orig"></canvas>
+            </div>
+            <div class="canvas-panel">
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="overlay">Detected Cells</button>
+                    <button class="view-btn" data-view="thresh">Threshold Mask</button>
+                </div>
+                <canvas id="canvas-result"></canvas>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <h3>Detection Parameters</h3>
+
+            <!-- Preprocessing -->
+            <div class="slider-row">
+                <label>Blur radius</label>
+                <input type="range" id="blur" min="1" max="21" step="2" value="3">
+                <span class="slider-val" id="blur-val">3</span>
+            </div>
+
+            <div class="slider-row">
+                <label>Threshold</label>
+                <input type="range" id="thresh" min="0" max="255" value="128">
+                <span class="slider-val" id="thresh-val">128</span>
+            </div>
+
+            <div class="check-row">
+                <label><input type="checkbox" id="otsu"> Otsu auto-threshold</label>
+                <label><input type="checkbox" id="invert" checked> Invert (dark cells on light bg)</label>
+            </div>
+
+            <hr class="section-divider">
+
+            <!-- Morphology -->
+            <div class="slider-row">
+                <label>Open iterations</label>
+                <input type="range" id="morph-open" min="0" max="10" value="1">
+                <span class="slider-val" id="morph-open-val">1</span>
+            </div>
+
+            <div class="slider-row">
+                <label>Close iterations</label>
+                <input type="range" id="morph-close" min="0" max="10" value="1">
+                <span class="slider-val" id="morph-close-val">1</span>
+            </div>
+
+            <hr class="section-divider">
+
+            <!-- Blob filters -->
+            <div class="area-row">
+                <label>Min area (px²)</label>
+                <input type="number" id="min-area" min="1" value="100">
+            </div>
+
+            <div class="area-row">
+                <label>Max area (px²)</label>
+                <input type="number" id="max-area" min="1" value="10000">
+            </div>
+
+            <div class="slider-row">
+                <label>Min circularity</label>
+                <input type="range" id="circularity" min="0" max="100" value="30">
+                <span class="slider-val" id="circularity-val">0.30</span>
+            </div>
+
+            <hr class="section-divider">
+
+            <div class="check-row">
+                <label><input type="checkbox" id="show-labels"> Show cell numbers</label>
+            </div>
+        </div>
+
+        <!-- Result -->
+        <div class="result-box">
+            <div class="result-count" id="result-count">—</div>
+            <div>
+                <div class="result-label">cells detected</div>
+                <div class="result-note" id="result-note"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-footer">Cell Counter &mdash; Lab Tools</div>
+
+    <!-- OpenCV.js (async, ~8 MB) -->
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady()" onerror="onOpenCvError()"></script>
+
+    <script>
+        let cvReady = false;
+        let currentView = 'overlay';
+        let debounceTimer = null;
+        let imageLoaded = false;
+
+        // ── OpenCV lifecycle ──────────────────────────────────────────────
+        function onOpenCvReady() {
+            cvReady = true;
+            const el = document.getElementById('cv-status');
+            el.textContent = 'OpenCV.js ready';
+            el.className = 'ready';
+            document.getElementById('load-btn').disabled = false;
+            if (imageLoaded) processImage();
+        }
+
+        function onOpenCvError() {
+            const el = document.getElementById('cv-status');
+            el.textContent = 'Failed to load OpenCV.js — check network connection';
+            el.className = 'error';
+        }
+
+        // ── File loading ──────────────────────────────────────────────────
+        document.getElementById('file-input').addEventListener('change', e => {
+            if (e.target.files[0]) loadImage(e.target.files[0]);
+        });
+
+        const dropZone = document.getElementById('drop_zone');
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('dragging');
+            if (e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]);
+        });
+        dropZone.addEventListener('click', () => document.getElementById('file-input').click());
+
+        function loadImage(file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvOrig = document.getElementById('canvas-orig');
+                    canvOrig.width = img.width;
+                    canvOrig.height = img.height;
+                    canvOrig.getContext('2d').drawImage(img, 0, 0);
+
+                    dropZone.style.display = 'none';
+                    document.getElementById('canvas-area').hidden = false;
+                    imageLoaded = true;
+
+                    if (cvReady) processImage();
+                    else document.getElementById('result-note').textContent = 'Waiting for OpenCV.js to finish loading…';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ── View toggle ───────────────────────────────────────────────────
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentView = btn.dataset.view;
+                if (cvReady && imageLoaded) processImage();
+            });
+        });
+
+        // ── Controls wiring ───────────────────────────────────────────────
+        const sliderIds = ['blur', 'thresh', 'morph-open', 'morph-close', 'circularity'];
+        sliderIds.forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                const val = document.getElementById(id).value;
+                const display = id === 'circularity' ? (val / 100).toFixed(2) : val;
+                document.getElementById(id + '-val').textContent = display;
+                scheduleProcess();
+            });
+        });
+
+        document.getElementById('otsu').addEventListener('change', function () {
+            document.getElementById('thresh').disabled = this.checked;
+            scheduleProcess();
+        });
+
+        ['invert', 'show-labels'].forEach(id =>
+            document.getElementById(id).addEventListener('change', scheduleProcess));
+        ['min-area', 'max-area'].forEach(id =>
+            document.getElementById(id).addEventListener('input', scheduleProcess));
+
+        function scheduleProcess() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(processImage, 100);
+        }
+
+        // ── Core processing ───────────────────────────────────────────────
+        function processImage() {
+            const canvOrig = document.getElementById('canvas-orig');
+            if (!cvReady || !imageLoaded || !canvOrig.width) return;
+
+            // Read parameters
+            const blurVal = parseInt(document.getElementById('blur').value);
+            const threshVal = parseInt(document.getElementById('thresh').value);
+            const useOtsu = document.getElementById('otsu').checked;
+            const invert = document.getElementById('invert').checked;
+            const openIter = parseInt(document.getElementById('morph-open').value);
+            const closeIter = parseInt(document.getElementById('morph-close').value);
+            const minArea = parseFloat(document.getElementById('min-area').value) || 1;
+            const maxArea = parseFloat(document.getElementById('max-area').value) || Infinity;
+            const minCirc = parseInt(document.getElementById('circularity').value) / 100;
+            const showLabels = document.getElementById('show-labels').checked;
+
+            // Allocate OpenCV Mats
+            let src = null, gray = null, blurred = null, binary = null;
+            let contours = null, hierarchy = null, displayMat = null, kernel = null;
+
+            try {
+                src = cv.imread(canvOrig);
+                gray = new cv.Mat();
+                blurred = new cv.Mat();
+                binary = new cv.Mat();
+
+                // 1. Grayscale
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+
+                // 2. Gaussian blur (kernel must be odd)
+                const ksize = blurVal % 2 === 0 ? blurVal + 1 : blurVal;
+                cv.GaussianBlur(gray, blurred, new cv.Size(ksize, ksize), 0);
+
+                // 3. Threshold
+                let threshType = invert ? cv.THRESH_BINARY_INV : cv.THRESH_BINARY;
+                if (useOtsu) threshType |= cv.THRESH_OTSU;
+                const computedThresh = cv.threshold(blurred, binary, useOtsu ? 0 : threshVal, 255, threshType);
+
+                // Update slider to show computed Otsu value
+                if (useOtsu) {
+                    document.getElementById('thresh').value = Math.round(computedThresh);
+                    document.getElementById('thresh-val').textContent = Math.round(computedThresh);
+                }
+
+                // 4. Morphological open — erode then dilate (removes small noise, separates touching cells)
+                // 5. Morphological close — dilate then erode (fills holes inside cells)
+                kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(3, 3));
+                if (openIter > 0) {
+                    cv.morphologyEx(binary, binary, cv.MORPH_OPEN, kernel,
+                        new cv.Point(-1, -1), openIter);
+                }
+                if (closeIter > 0) {
+                    cv.morphologyEx(binary, binary, cv.MORPH_CLOSE, kernel,
+                        new cv.Point(-1, -1), closeIter);
+                }
+
+                // 6. Find contours
+                contours = new cv.MatVector();
+                hierarchy = new cv.Mat();
+                cv.findContours(binary, contours, hierarchy,
+                    cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+                // 7. Filter by area and circularity
+                // circularity = 4π·Area / Perimeter²  (= 1.0 for a perfect circle)
+                const validCells = [];
+                for (let i = 0; i < contours.size(); i++) {
+                    const c = contours.get(i);
+                    const area = cv.contourArea(c);
+                    if (area < minArea || area > maxArea) continue;
+
+                    const perimeter = cv.arcLength(c, true);
+                    const circ = perimeter > 0 ? (4 * Math.PI * area) / (perimeter * perimeter) : 0;
+                    if (circ < minCirc) continue;
+
+                    const m = cv.moments(c);
+                    if (m.m00 === 0) continue;
+
+                    validCells.push({
+                        index: i,
+                        cx: Math.round(m.m10 / m.m00),
+                        cy: Math.round(m.m01 / m.m00),
+                        radius: Math.max(4, Math.round(Math.sqrt(area / Math.PI)))
+                    });
+                }
+
+                // 8. Build result canvas
+                const canvResult = document.getElementById('canvas-result');
+                canvResult.width = canvOrig.width;
+                canvResult.height = canvOrig.height;
+
+                if (currentView === 'thresh') {
+                    displayMat = new cv.Mat();
+                    cv.cvtColor(binary, displayMat, cv.COLOR_GRAY2RGBA);
+                    // Highlight accepted contours in red
+                    validCells.forEach(cell => {
+                        cv.drawContours(displayMat, contours, cell.index,
+                            new cv.Scalar(255, 60, 60, 255), 2);
+                    });
+                } else {
+                    displayMat = src.clone();
+                    validCells.forEach(cell => {
+                        // Outline circle
+                        cv.circle(displayMat, new cv.Point(cell.cx, cell.cy),
+                            cell.radius, new cv.Scalar(0, 220, 80, 255), 2);
+                        // Centre dot
+                        cv.circle(displayMat, new cv.Point(cell.cx, cell.cy),
+                            3, new cv.Scalar(255, 50, 50, 255), -1);
+                    });
+                }
+
+                // Optional: cell number labels
+                if (showLabels) {
+                    validCells.forEach((cell, n) => {
+                        cv.putText(displayMat, String(n + 1),
+                            new cv.Point(cell.cx + cell.radius + 3, cell.cy - cell.radius - 3),
+                            cv.FONT_HERSHEY_SIMPLEX, 0.45,
+                            new cv.Scalar(255, 255, 0, 255), 1);
+                    });
+                }
+
+                cv.imshow(canvResult, displayMat);
+
+                // Update result display
+                document.getElementById('result-count').textContent = validCells.length;
+                document.getElementById('result-note').textContent =
+                    `${contours.size()} total contours found; ${contours.size() - validCells.length} filtered out`;
+
+            } catch (err) {
+                console.error('Processing error:', err);
+                document.getElementById('result-note').textContent = 'Error: ' + err.message;
+            } finally {
+                if (src) src.delete();
+                if (gray) gray.delete();
+                if (blurred) blurred.delete();
+                if (binary) binary.delete();
+                if (kernel) kernel.delete();
+                if (contours) contours.delete();
+                if (hierarchy) hierarchy.delete();
+                if (displayMat) displayMat.delete();
+            }
+        }
+    </script>
+</body>
+</html>
