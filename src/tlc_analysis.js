@@ -26,6 +26,12 @@
         thresholdEnabled: false,
         thresholdValue: 128,
         undoStack: [],
+        // Crop state
+        cropRect: null,
+        _cropStart: null,
+        // Multi-plate state
+        plates: [],
+        activePlateIndex: -1,
         // Label settings
         labelFontSize: 13,
         labelColor: "#f97316",
@@ -87,6 +93,10 @@
             this.thresholdEnabled = false;
             this.thresholdValue = 128;
             this.undoStack = [];
+            this.plates = [];
+            this.activePlateIndex = -1;
+            this.cropRect = null;
+            this._cropStart = null;
         },
 
         // ---- Undo / Delete ----
@@ -96,7 +106,16 @@
                 originY: this.originY,
                 frontY: this.frontY,
                 spots: this.spots.map(s => ({ ...s })),
-                laneX: this.laneX
+                laneX: this.laneX,
+                plates: this.plates.map(p => ({
+                    rect: { ...p.rect },
+                    originY: p.originY,
+                    frontY: p.frontY,
+                    spots: p.spots.map(s => ({ ...s })),
+                    laneX: p.laneX,
+                    laneWidth: p.laneWidth
+                })),
+                activePlateIndex: this.activePlateIndex
             });
         },
 
@@ -107,13 +126,22 @@
             this.frontY = state.frontY;
             this.spots = state.spots;
             this.laneX = state.laneX;
+            this.plates = state.plates;
+            this.activePlateIndex = state.activePlateIndex;
             return true;
         },
 
         deleteSpot(index) {
-            if (index < 0 || index >= this.spots.length) return;
-            this.pushUndo();
-            this.spots.splice(index, 1);
+            if (this.plates.length > 0) {
+                const plate = this.getActivePlate();
+                if (!plate || index < 0 || index >= plate.spots.length) return;
+                this.pushUndo();
+                plate.spots.splice(index, 1);
+            } else {
+                if (index < 0 || index >= this.spots.length) return;
+                this.pushUndo();
+                this.spots.splice(index, 1);
+            }
         },
 
         // ---- Image Rotation ----
@@ -155,7 +183,113 @@
             this.spots = [];
             this.laneX = null;
             this.undoStack = [];
+            this.plates = [];
+            this.activePlateIndex = -1;
             this.redraw(canvas);
+        },
+
+        // ---- Crop ----
+
+        startCrop(x, y) {
+            this._cropStart = { x, y };
+            this.cropRect = null;
+        },
+
+        updateCrop(x, y) {
+            if (!this._cropStart) return;
+            const sx = this._cropStart.x, sy = this._cropStart.y;
+            this.cropRect = {
+                x: Math.min(sx, x),
+                y: Math.min(sy, y),
+                w: Math.abs(x - sx),
+                h: Math.abs(y - sy)
+            };
+        },
+
+        addPlate() {
+            if (!this.cropRect) return false;
+            const r = this.cropRect;
+            if (r.w < 10 || r.h < 10) return false;
+            this.pushUndo();
+            this.plates.push({
+                rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h) },
+                originY: null,
+                frontY: null,
+                spots: [],
+                laneX: null,
+                laneWidth: 20
+            });
+            this.activePlateIndex = this.plates.length - 1;
+            this.originY = null;
+            this.frontY = null;
+            this.spots = [];
+            this.laneX = null;
+            this.cropRect = null;
+            this._cropStart = null;
+            return true;
+        },
+
+        selectPlate(index) {
+            if (index >= 0 && index < this.plates.length) {
+                this.activePlateIndex = index;
+            }
+        },
+
+        deletePlate(index) {
+            if (index < 0 || index >= this.plates.length) return;
+            this.pushUndo();
+            this.plates.splice(index, 1);
+            if (this.plates.length === 0) {
+                this.activePlateIndex = -1;
+            } else if (this.activePlateIndex >= this.plates.length) {
+                this.activePlateIndex = this.plates.length - 1;
+            } else if (index < this.activePlateIndex) {
+                this.activePlateIndex--;
+            }
+        },
+
+        getActivePlate() {
+            if (this.activePlateIndex >= 0 && this.activePlateIndex < this.plates.length) {
+                return this.plates[this.activePlateIndex];
+            }
+            return null;
+        },
+
+        findPlateAt(x, y) {
+            for (let i = this.plates.length - 1; i >= 0; i--) {
+                const r = this.plates[i].rect;
+                if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+                    return i;
+                }
+            }
+            return -1;
+        },
+
+        cancelCrop() {
+            this.cropRect = null;
+            this._cropStart = null;
+        },
+
+        // ---- CSV Export ----
+
+        exportCSV() {
+            const dec = this.labelDecimals;
+            if (this.plates.length > 0) {
+                let csv = "Plate,Spot,Rf,X,Y\n";
+                this.plates.forEach((plate, pi) => {
+                    plate.spots.forEach((s, si) => {
+                        const rf = s.rf != null ? s.rf.toFixed(dec) : "";
+                        csv += `${pi + 1},${si + 1},${rf},${s.x},${s.y}\n`;
+                    });
+                });
+                return csv;
+            }
+            let csv = "Spot,Rf,X,Y\n";
+            this.spots.forEach((s, i) => {
+                const rf = s.rf != null ? s.rf.toFixed(dec) : "";
+                csv += `${i + 1},${rf},${s.x},${s.y}\n`;
+            });
+            return csv;
         },
 
         // ---- Pixel Processing ----
@@ -388,21 +522,72 @@
                 this.applyAdjustments(canvas, this.brightness, this.contrast);
             }
 
-            // Origin line
-            if (this.originY !== null) {
-                this._drawHLine(ctx, this.originY, "#22c55e", "Origin");
+            if (this.plates.length > 0) {
+                // Multi-plate mode: draw per-plate annotations
+                this.plates.forEach((plate, i) => {
+                    const r = plate.rect;
+                    const isActive = i === this.activePlateIndex;
+
+                    // Plate rectangle border
+                    ctx.save();
+                    ctx.strokeStyle = isActive ? "#06b6d4" : "#94a3b8";
+                    ctx.lineWidth = isActive ? 3 : 1.5;
+                    ctx.strokeRect(r.x, r.y, r.w, r.h);
+                    ctx.fillStyle = isActive ? "#06b6d4" : "#94a3b8";
+                    ctx.font = "bold 14px sans-serif";
+                    ctx.fillText("Plate " + (i + 1), r.x + 4, r.y - 4);
+                    ctx.restore();
+
+                    // Clip annotations to plate rect
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(r.x, r.y, r.w, r.h);
+                    ctx.clip();
+                    if (plate.originY !== null) {
+                        this._drawHLine(ctx, plate.originY, "#22c55e", "Origin");
+                    }
+                    if (plate.frontY !== null) {
+                        this._drawHLine(ctx, plate.frontY, "#ef4444", "Front");
+                    }
+                    plate.spots.forEach((s, j) => {
+                        this._drawSpot(ctx, s.x, s.y, j + 1, s.rf);
+                    });
+                    if (plate.laneX !== null) {
+                        this._drawVLine(ctx, plate.laneX, "#8b5cf6", "Lane");
+                    }
+                    ctx.restore();
+                });
+            } else {
+                // Flat mode: draw annotations on full image
+                if (this.originY !== null) {
+                    this._drawHLine(ctx, this.originY, "#22c55e", "Origin");
+                }
+                if (this.frontY !== null) {
+                    this._drawHLine(ctx, this.frontY, "#ef4444", "Front");
+                }
+                this.spots.forEach((s, i) => {
+                    this._drawSpot(ctx, s.x, s.y, i + 1, s.rf);
+                });
+                if (this.laneX !== null) {
+                    this._drawVLine(ctx, this.laneX, "#8b5cf6", "Lane");
+                }
             }
-            // Front line
-            if (this.frontY !== null) {
-                this._drawHLine(ctx, this.frontY, "#ef4444", "Front");
-            }
-            // Spot markers
-            this.spots.forEach((s, i) => {
-                this._drawSpot(ctx, s.x, s.y, i + 1, s.rf);
-            });
-            // Lane indicator
-            if (this.laneX !== null) {
-                this._drawVLine(ctx, this.laneX, "#8b5cf6", "Lane");
+
+            // Crop overlay (in-progress rectangle)
+            if (this.cropRect) {
+                const r = this.cropRect;
+                ctx.save();
+                ctx.fillStyle = "rgba(0,0,0,0.45)";
+                ctx.fillRect(0, 0, this.canvasWidth, r.y);
+                ctx.fillRect(0, r.y + r.h, this.canvasWidth, this.canvasHeight - r.y - r.h);
+                ctx.fillRect(0, r.y, r.x, r.h);
+                ctx.fillRect(r.x + r.w, r.y, this.canvasWidth - r.x - r.w, r.h);
+                ctx.strokeStyle = "#fff";
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 4]);
+                ctx.strokeRect(r.x, r.y, r.w, r.h);
+                ctx.setLineDash([]);
+                ctx.restore();
             }
         },
 

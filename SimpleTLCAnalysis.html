@@ -233,6 +233,67 @@
             background: #dcfce7;
         }
 
+        #export-csv-btn {
+            background: #f0fdf4;
+            border-color: #86efac;
+            color: #15803d;
+        }
+
+        #export-csv-btn:hover {
+            background: #dcfce7;
+        }
+
+        #add-plate-btn {
+            background: #22c55e;
+            border-color: #22c55e;
+            color: white;
+        }
+
+        #add-plate-btn:hover {
+            opacity: 0.9;
+        }
+
+        .plate-bar {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .plate-tab {
+            padding: 6px 12px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .plate-tab.active {
+            background: #ecfeff;
+            border-color: #06b6d4;
+            color: #0891b2;
+            font-weight: 600;
+        }
+
+        .plate-tab-delete {
+            background: none;
+            border: none;
+            color: #dc2626;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            padding: 0 2px;
+            line-height: 1;
+        }
+
+        .plate-tab-delete:hover {
+            color: #991b1b;
+        }
+
         /* Adjustments */
         .adjustments {
             margin-bottom: 20px;
@@ -405,14 +466,20 @@
 
             <!-- Mode Buttons -->
             <div class="mode-section">
+                <button class="mode-btn" data-mode="crop">Crop</button>
+                <button id="add-plate-btn" class="mode-btn" hidden>Add Plate</button>
                 <button class="mode-btn" data-mode="origin">Set Origin</button>
                 <button class="mode-btn" data-mode="front">Set Solvent Front</button>
                 <button class="mode-btn" data-mode="spot">Mark Spots</button>
                 <button class="mode-btn" data-mode="lane">Select Lane</button>
                 <button id="undo-btn" class="mode-btn">Undo</button>
                 <button id="save-image-btn" class="mode-btn">Save Image</button>
+                <button id="export-csv-btn" class="mode-btn">Export CSV</button>
                 <button id="clear-all">Clear All</button>
             </div>
+
+            <!-- Plate Selector -->
+            <div id="plate-bar" class="plate-bar" hidden></div>
 
             <!-- Adjustments -->
             <div class="adjustments">
@@ -506,7 +573,7 @@
             const rfTbody = document.getElementById("rf-tbody");
             const noSpotsMsg = document.getElementById("no-spots-msg");
             const noLaneMsg = document.getElementById("no-lane-msg");
-            const modeButtons = document.querySelectorAll(".mode-btn");
+            const modeButtons = document.querySelectorAll(".mode-btn[data-mode]");
 
             let cameraStream = null;
 
@@ -528,8 +595,10 @@
                 canvas.hidden = false;
                 controls.hidden = false;
                 results.hidden = false;
+                addPlateBtn.hidden = true;
                 TLC.loadImage(source, canvas).then(() => {
                     setChartSize();
+                    updatePlateBar();
                     updateRfTable();
                     updateChart();
                 });
@@ -554,9 +623,11 @@
                 canvas.hidden = false;
                 controls.hidden = false;
                 results.hidden = false;
+                addPlateBtn.hidden = true;
                 TLC.loadFromVideo(video, canvas).then(() => {
                     stopCamera();
                     setChartSize();
+                    updatePlateBar();
                     updateRfTable();
                     updateChart();
                 });
@@ -574,12 +645,24 @@
             }
 
             // ---- Mode Buttons ----
+            const addPlateBtn = document.getElementById("add-plate-btn");
+
             modeButtons.forEach((btn) => {
                 btn.addEventListener("click", () => {
                     const mode = btn.dataset.mode;
+                    if (TLC.interactionMode === "crop" && mode !== "crop") {
+                        TLC.cancelCrop();
+                        addPlateBtn.hidden = true;
+                        TLC.redraw(canvas);
+                    }
                     if (TLC.interactionMode === mode) {
                         TLC.interactionMode = "none";
                         btn.classList.remove("active");
+                        if (mode === "crop") {
+                            TLC.cancelCrop();
+                            addPlateBtn.hidden = true;
+                            TLC.redraw(canvas);
+                        }
                     } else {
                         TLC.interactionMode = mode;
                         modeButtons.forEach((b) => b.classList.remove("active"));
@@ -591,6 +674,7 @@
             document.getElementById("clear-all").addEventListener("click", () => {
                 TLC.resetState();
                 modeButtons.forEach((b) => b.classList.remove("active"));
+                addPlateBtn.hidden = true;
                 document.getElementById("brightness-slider").value = 0;
                 document.getElementById("contrast-slider").value = 0;
                 document.getElementById("threshold-toggle").checked = false;
@@ -600,6 +684,7 @@
                 document.getElementById("contrast-val").textContent = "0";
                 document.getElementById("threshold-val").textContent = "128";
                 TLC.redraw(canvas);
+                updatePlateBar();
                 updateRfTable();
                 updateChart();
             });
@@ -607,33 +692,75 @@
             // ---- Canvas Click ----
             canvas.addEventListener("click", (e) => {
                 if (!TLC.originalImageData) return;
+                if (TLC.interactionMode === "crop") return;
                 const { x, y } = TLC.getCanvasCoords(canvas, e);
 
-                switch (TLC.interactionMode) {
-                    case "origin":
-                        TLC.pushUndo();
-                        TLC.originY = y;
-                        recalcAllRf();
-                        break;
-                    case "front":
-                        TLC.pushUndo();
-                        TLC.frontY = y;
-                        recalcAllRf();
-                        break;
-                    case "spot":
-                        TLC.pushUndo();
-                        const rf = (TLC.originY !== null && TLC.frontY !== null)
-                            ? TLC.calculateRf(TLC.originY, TLC.frontY, y)
-                            : null;
-                        TLC.spots.push({ x, y, rf });
-                        break;
-                    case "lane":
-                        TLC.pushUndo();
-                        TLC.laneX = x;
-                        TLC.laneWidth = parseInt(document.getElementById("lane-width").value) || 20;
-                        break;
-                    default:
-                        return;
+                if (TLC.plates.length > 0) {
+                    // Multi-plate mode: find which plate was clicked
+                    const pi = TLC.findPlateAt(x, y);
+                    if (pi === -1) return; // click outside all plates — ignore
+                    if (pi !== TLC.activePlateIndex) {
+                        TLC.selectPlate(pi);
+                        updatePlateBar();
+                    }
+                    const plate = TLC.getActivePlate();
+                    if (!plate) return;
+                    const lw = parseInt(document.getElementById("lane-width").value) || 20;
+
+                    switch (TLC.interactionMode) {
+                        case "origin":
+                            TLC.pushUndo();
+                            plate.originY = y;
+                            recalcPlateRf(plate);
+                            break;
+                        case "front":
+                            TLC.pushUndo();
+                            plate.frontY = y;
+                            recalcPlateRf(plate);
+                            break;
+                        case "spot":
+                            TLC.pushUndo();
+                            const rf = (plate.originY !== null && plate.frontY !== null)
+                                ? TLC.calculateRf(plate.originY, plate.frontY, y)
+                                : null;
+                            plate.spots.push({ x, y, rf });
+                            break;
+                        case "lane":
+                            TLC.pushUndo();
+                            plate.laneX = x;
+                            plate.laneWidth = lw;
+                            break;
+                        default:
+                            return;
+                    }
+                } else {
+                    // Flat mode: no plates
+                    switch (TLC.interactionMode) {
+                        case "origin":
+                            TLC.pushUndo();
+                            TLC.originY = y;
+                            recalcAllRf();
+                            break;
+                        case "front":
+                            TLC.pushUndo();
+                            TLC.frontY = y;
+                            recalcAllRf();
+                            break;
+                        case "spot":
+                            TLC.pushUndo();
+                            const rf = (TLC.originY !== null && TLC.frontY !== null)
+                                ? TLC.calculateRf(TLC.originY, TLC.frontY, y)
+                                : null;
+                            TLC.spots.push({ x, y, rf });
+                            break;
+                        case "lane":
+                            TLC.pushUndo();
+                            TLC.laneX = x;
+                            TLC.laneWidth = parseInt(document.getElementById("lane-width").value) || 20;
+                            break;
+                        default:
+                            return;
+                    }
                 }
 
                 TLC.redraw(canvas);
@@ -641,12 +768,24 @@
                 updateChart();
             });
 
-            function recalcAllRf() {
-                TLC.spots.forEach((s) => {
-                    if (TLC.originY !== null && TLC.frontY !== null) {
-                        s.rf = TLC.calculateRf(TLC.originY, TLC.frontY, s.y);
+            function recalcPlateRf(plate) {
+                plate.spots.forEach((s) => {
+                    if (plate.originY !== null && plate.frontY !== null) {
+                        s.rf = TLC.calculateRf(plate.originY, plate.frontY, s.y);
                     }
                 });
+            }
+
+            function recalcAllRf() {
+                if (TLC.plates.length > 0) {
+                    TLC.plates.forEach((plate) => recalcPlateRf(plate));
+                } else {
+                    TLC.spots.forEach((s) => {
+                        if (TLC.originY !== null && TLC.frontY !== null) {
+                            s.rf = TLC.calculateRf(TLC.originY, TLC.frontY, s.y);
+                        }
+                    });
+                }
             }
 
             // ---- Sliders ----
@@ -688,6 +827,7 @@
             document.getElementById("undo-btn").addEventListener("click", () => {
                 if (TLC.undo()) {
                     TLC.redraw(canvas);
+                    updatePlateBar();
                     updateRfTable();
                     updateChart();
                 }
@@ -698,6 +838,7 @@
                     e.preventDefault();
                     if (TLC.undo()) {
                         TLC.redraw(canvas);
+                        updatePlateBar();
                         updateRfTable();
                         updateChart();
                     }
@@ -707,12 +848,14 @@
             // ---- Rotation ----
             document.getElementById("rotate-cw").addEventListener("click", () => {
                 TLC.rotateImage(canvas, 90);
+                updatePlateBar();
                 updateRfTable();
                 updateChart();
             });
 
             document.getElementById("rotate-ccw").addEventListener("click", () => {
                 TLC.rotateImage(canvas, -90);
+                updatePlateBar();
                 updateRfTable();
                 updateChart();
             });
@@ -725,6 +868,92 @@
                 link.download = "TLC_analysis.png";
                 link.href = canvas.toDataURL("image/png");
                 link.click();
+            });
+
+            // ---- Crop (mouse + touch) ----
+            function getCropCoords(e) {
+                if (e.touches) {
+                    const t = e.touches[0];
+                    const rect = canvas.getBoundingClientRect();
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    return {
+                        x: Math.round((t.clientX - rect.left) * scaleX),
+                        y: Math.round((t.clientY - rect.top) * scaleY)
+                    };
+                }
+                return TLC.getCanvasCoords(canvas, e);
+            }
+
+            canvas.addEventListener("mousedown", (e) => {
+                if (TLC.interactionMode !== "crop" || !TLC.originalImageData) return;
+                const { x, y } = getCropCoords(e);
+                TLC.startCrop(x, y);
+                addPlateBtn.hidden = true;
+            });
+
+            canvas.addEventListener("mousemove", (e) => {
+                if (TLC.interactionMode !== "crop" || !TLC._cropStart) return;
+                const { x, y } = getCropCoords(e);
+                TLC.updateCrop(x, y);
+                TLC.redraw(canvas);
+            });
+
+            canvas.addEventListener("mouseup", () => {
+                if (TLC.interactionMode !== "crop" || !TLC._cropStart) return;
+                TLC._cropStart = null;
+                if (TLC.cropRect && TLC.cropRect.w > 10 && TLC.cropRect.h > 10) {
+                    addPlateBtn.hidden = false;
+                }
+            });
+
+            canvas.addEventListener("touchstart", (e) => {
+                if (TLC.interactionMode !== "crop" || !TLC.originalImageData) return;
+                e.preventDefault();
+                const { x, y } = getCropCoords(e);
+                TLC.startCrop(x, y);
+                addPlateBtn.hidden = true;
+            }, { passive: false });
+
+            canvas.addEventListener("touchmove", (e) => {
+                if (TLC.interactionMode !== "crop" || !TLC._cropStart) return;
+                e.preventDefault();
+                const { x, y } = getCropCoords(e);
+                TLC.updateCrop(x, y);
+                TLC.redraw(canvas);
+            }, { passive: false });
+
+            canvas.addEventListener("touchend", () => {
+                if (TLC.interactionMode !== "crop" || !TLC.cropRect) return;
+                TLC._cropStart = null;
+                if (TLC.cropRect.w > 10 && TLC.cropRect.h > 10) {
+                    addPlateBtn.hidden = false;
+                }
+            });
+
+            addPlateBtn.addEventListener("click", () => {
+                if (TLC.addPlate()) {
+                    addPlateBtn.hidden = true;
+                    updatePlateBar();
+                    updateRfTable();
+                    updateChart();
+                    TLC.redraw(canvas);
+                }
+            });
+
+            // ---- Export CSV ----
+            document.getElementById("export-csv-btn").addEventListener("click", () => {
+                const hasSpots = TLC.plates.length > 0
+                    ? TLC.plates.some(p => p.spots.length > 0)
+                    : TLC.spots.length > 0;
+                if (!hasSpots) return;
+                const csv = TLC.exportCSV();
+                const blob = new Blob([csv], { type: "text/csv" });
+                const link = document.createElement("a");
+                link.download = "TLC_rf_values.csv";
+                link.href = URL.createObjectURL(blob);
+                link.click();
+                URL.revokeObjectURL(link.href);
             });
 
             // ---- Label Settings ----
@@ -749,15 +978,57 @@
                 updateRfTable();
             });
 
+            // ---- Plate Bar ----
+            function updatePlateBar() {
+                const bar = document.getElementById("plate-bar");
+                bar.innerHTML = "";
+                if (TLC.plates.length === 0) {
+                    bar.hidden = true;
+                    return;
+                }
+                bar.hidden = false;
+                TLC.plates.forEach((plate, i) => {
+                    const tab = document.createElement("div");
+                    tab.className = "plate-tab" + (i === TLC.activePlateIndex ? " active" : "");
+                    const label = document.createElement("span");
+                    label.textContent = "Plate " + (i + 1);
+                    label.addEventListener("click", () => {
+                        TLC.selectPlate(i);
+                        updatePlateBar();
+                        updateRfTable();
+                        updateChart();
+                        TLC.redraw(canvas);
+                    });
+                    const delBtn = document.createElement("button");
+                    delBtn.className = "plate-tab-delete";
+                    delBtn.textContent = "\u00d7";
+                    delBtn.title = "Delete plate";
+                    delBtn.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        TLC.deletePlate(i);
+                        updatePlateBar();
+                        updateRfTable();
+                        updateChart();
+                        TLC.redraw(canvas);
+                    });
+                    tab.appendChild(label);
+                    tab.appendChild(delBtn);
+                    bar.appendChild(tab);
+                });
+            }
+
             // ---- Rf Table ----
             function updateRfTable() {
                 rfTbody.innerHTML = "";
-                if (TLC.spots.length === 0) {
+                const spots = TLC.plates.length > 0
+                    ? (TLC.getActivePlate()?.spots || [])
+                    : TLC.spots;
+                if (spots.length === 0) {
                     noSpotsMsg.hidden = false;
                     return;
                 }
                 noSpotsMsg.hidden = true;
-                TLC.spots.forEach((s, i) => {
+                spots.forEach((s, i) => {
                     const tr = document.createElement("tr");
                     const td1 = document.createElement("td");
                     td1.textContent = i + 1;
@@ -790,18 +1061,38 @@
             }
 
             function updateChart() {
-                if (TLC.laneX === null || TLC.originY === null || TLC.frontY === null) {
-                    noLaneMsg.hidden = !(TLC.laneX === null);
-                    TLC.drawIntensityChart(chartCanvas, [], TLC.spots);
+                let laneX, originY, frontY, spots, lw;
+                if (TLC.plates.length > 0) {
+                    const plate = TLC.getActivePlate();
+                    if (!plate) {
+                        TLC.drawIntensityChart(chartCanvas, [], []);
+                        noLaneMsg.hidden = false;
+                        return;
+                    }
+                    laneX = plate.laneX;
+                    originY = plate.originY;
+                    frontY = plate.frontY;
+                    spots = plate.spots;
+                    lw = plate.laneWidth || 20;
+                } else {
+                    laneX = TLC.laneX;
+                    originY = TLC.originY;
+                    frontY = TLC.frontY;
+                    spots = TLC.spots;
+                    lw = parseInt(document.getElementById("lane-width").value) || 20;
+                    TLC.laneWidth = lw;
+                }
+
+                if (laneX === null || originY === null || frontY === null) {
+                    noLaneMsg.hidden = !(laneX === null);
+                    TLC.drawIntensityChart(chartCanvas, [], spots);
                     return;
                 }
                 noLaneMsg.hidden = true;
-                const lw = parseInt(document.getElementById("lane-width").value) || 20;
-                TLC.laneWidth = lw;
                 const profile = TLC.getIntensityProfile(
-                    canvas, TLC.laneX, lw, TLC.frontY, TLC.originY
+                    canvas, laneX, lw, frontY, originY
                 );
-                TLC.drawIntensityChart(chartCanvas, profile, TLC.spots);
+                TLC.drawIntensityChart(chartCanvas, profile, spots);
             }
 
             // Resize chart on window resize
