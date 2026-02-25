@@ -11,6 +11,8 @@
     const TLC = {
         // State
         originalImageData: null,
+        _rawImage: null,
+        rotationDeg: 0,
         originY: null,
         frontY: null,
         spots: [],
@@ -23,6 +25,12 @@
         contrast: 0,
         thresholdEnabled: false,
         thresholdValue: 128,
+        undoStack: [],
+        // Label settings
+        labelFontSize: 13,
+        labelColor: "#f97316",
+        labelOrientation: "horizontal",
+        labelDecimals: 3,
 
         // ---- Image Loading ----
 
@@ -45,6 +53,8 @@
                     const ctx = canvas.getContext("2d");
                     ctx.drawImage(img, 0, 0, w, h);
                     this.originalImageData = ctx.getImageData(0, 0, w, h);
+                    this._rawImage = img;
+                    this.rotationDeg = 0;
                     this.resetState();
                     resolve({ width: w, height: h });
                 };
@@ -76,6 +86,76 @@
             this.contrast = 0;
             this.thresholdEnabled = false;
             this.thresholdValue = 128;
+            this.undoStack = [];
+        },
+
+        // ---- Undo / Delete ----
+
+        pushUndo() {
+            this.undoStack.push({
+                originY: this.originY,
+                frontY: this.frontY,
+                spots: this.spots.map(s => ({ ...s })),
+                laneX: this.laneX
+            });
+        },
+
+        undo() {
+            if (this.undoStack.length === 0) return false;
+            const state = this.undoStack.pop();
+            this.originY = state.originY;
+            this.frontY = state.frontY;
+            this.spots = state.spots;
+            this.laneX = state.laneX;
+            return true;
+        },
+
+        deleteSpot(index) {
+            if (index < 0 || index >= this.spots.length) return;
+            this.pushUndo();
+            this.spots.splice(index, 1);
+        },
+
+        // ---- Image Rotation ----
+
+        rotateImage(canvas, degrees) {
+            if (!this._rawImage) return;
+            this.rotationDeg = ((this.rotationDeg + degrees) % 360 + 360) % 360;
+
+            const img = this._rawImage;
+            let srcW = img.width, srcH = img.height;
+            const maxEdge = Math.max(srcW, srcH);
+            if (maxEdge > MAX_IMAGE_EDGE) {
+                const scale = MAX_IMAGE_EDGE / maxEdge;
+                srcW = Math.round(srcW * scale);
+                srcH = Math.round(srcH * scale);
+            }
+
+            const rad = this.rotationDeg * Math.PI / 180;
+            const swap = (this.rotationDeg === 90 || this.rotationDeg === 270);
+            const w = swap ? srcH : srcW;
+            const h = swap ? srcW : srcH;
+
+            const tmp = document.createElement("canvas");
+            tmp.width = w;
+            tmp.height = h;
+            const tctx = tmp.getContext("2d");
+            tctx.translate(w / 2, h / 2);
+            tctx.rotate(rad);
+            tctx.drawImage(img, -srcW / 2, -srcH / 2, srcW, srcH);
+
+            canvas.width = w;
+            canvas.height = h;
+            this.canvasWidth = w;
+            this.canvasHeight = h;
+            this.originalImageData = tctx.getImageData(0, 0, w, h);
+
+            this.originY = null;
+            this.frontY = null;
+            this.spots = [];
+            this.laneX = null;
+            this.undoStack = [];
+            this.redraw(canvas);
         },
 
         // ---- Pixel Processing ----
@@ -359,17 +439,29 @@
         },
 
         _drawSpot(ctx, x, y, num, rf) {
+            const color = this.labelColor;
+            const fontSize = this.labelFontSize;
+            const decimals = this.labelDecimals;
+            const vertical = this.labelOrientation === "vertical";
+
             ctx.save();
-            ctx.strokeStyle = "#f97316";
+            ctx.strokeStyle = color;
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(x, y, 10, 0, 2 * Math.PI);
             ctx.stroke();
 
-            ctx.fillStyle = "#f97316";
-            ctx.font = "bold 13px sans-serif";
-            const label = rf != null ? `#${num} Rf=${rf.toFixed(3)}` : `#${num}`;
-            ctx.fillText(label, x + 14, y + 4);
+            ctx.fillStyle = color;
+            ctx.font = `bold ${fontSize}px sans-serif`;
+            const label = rf != null ? `#${num} Rf=${rf.toFixed(decimals)}` : `#${num}`;
+
+            if (vertical) {
+                ctx.translate(x, y - 14);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText(label, 0, 0);
+            } else {
+                ctx.fillText(label, x + 14, y + 4);
+            }
             ctx.restore();
         },
 

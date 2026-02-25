@@ -135,6 +135,104 @@
             background: #fee2e2;
         }
 
+        #undo-btn {
+            background: #fffbeb;
+            border-color: #fcd34d;
+            color: #b45309;
+        }
+
+        #undo-btn:hover {
+            background: #fef3c7;
+        }
+
+        .rotate-section {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .rotate-btn {
+            padding: 6px 12px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .rotate-btn:hover {
+            border-color: var(--primary);
+        }
+
+        .label-settings {
+            margin-bottom: 12px;
+        }
+
+        .label-settings summary {
+            cursor: pointer;
+            font-size: 13px;
+            color: #555;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .label-settings-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 6px 10px;
+            align-items: center;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .label-settings-grid input[type="number"] {
+            width: 60px;
+            padding: 4px 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .label-settings-grid input[type="color"] {
+            width: 36px;
+            height: 28px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 2px;
+            cursor: pointer;
+        }
+
+        .label-settings-grid select {
+            padding: 4px 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .spot-delete-btn {
+            background: none;
+            border: none;
+            color: #dc2626;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: bold;
+            padding: 0 4px;
+            line-height: 1;
+        }
+
+        .spot-delete-btn:hover {
+            color: #991b1b;
+        }
+
+        #save-image-btn {
+            background: #f0fdf4;
+            border-color: #86efac;
+            color: #15803d;
+        }
+
+        #save-image-btn:hover {
+            background: #dcfce7;
+        }
+
         /* Adjustments */
         .adjustments {
             margin-bottom: 20px;
@@ -299,12 +397,20 @@
 
         <!-- Controls (hidden until image loaded) -->
         <div id="controls" hidden>
+            <!-- Rotation -->
+            <div class="rotate-section">
+                <button class="rotate-btn" id="rotate-ccw">Rotate 90° CCW</button>
+                <button class="rotate-btn" id="rotate-cw">Rotate 90° CW</button>
+            </div>
+
             <!-- Mode Buttons -->
             <div class="mode-section">
                 <button class="mode-btn" data-mode="origin">Set Origin</button>
                 <button class="mode-btn" data-mode="front">Set Solvent Front</button>
                 <button class="mode-btn" data-mode="spot">Mark Spots</button>
                 <button class="mode-btn" data-mode="lane">Select Lane</button>
+                <button id="undo-btn" class="mode-btn">Undo</button>
+                <button id="save-image-btn" class="mode-btn">Save Image</button>
                 <button id="clear-all">Clear All</button>
             </div>
 
@@ -333,6 +439,22 @@
                     <label>Lane Width (px):</label>
                     <input type="number" id="lane-width" value="20" min="1" max="200">
                 </div>
+                <div class="label-settings">
+                    <label style="font-weight:600;font-size:13px;color:#555">Label Settings</label>
+                    <div class="label-settings-grid">
+                        <label>Font Size:</label>
+                        <input type="number" id="label-font-size" value="13" min="8" max="30">
+                        <label>Color:</label>
+                        <input type="color" id="label-color" value="#f97316">
+                        <label>Orientation:</label>
+                        <select id="label-orientation">
+                            <option value="horizontal">Horizontal</option>
+                            <option value="vertical">Vertical</option>
+                        </select>
+                        <label>Decimals:</label>
+                        <input type="number" id="label-decimals" value="3" min="0" max="5">
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -345,6 +467,7 @@
                         <tr>
                             <th>Spot #</th>
                             <th>Rf</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody id="rf-tbody"></tbody>
@@ -488,20 +611,24 @@
 
                 switch (TLC.interactionMode) {
                     case "origin":
+                        TLC.pushUndo();
                         TLC.originY = y;
                         recalcAllRf();
                         break;
                     case "front":
+                        TLC.pushUndo();
                         TLC.frontY = y;
                         recalcAllRf();
                         break;
                     case "spot":
+                        TLC.pushUndo();
                         const rf = (TLC.originY !== null && TLC.frontY !== null)
                             ? TLC.calculateRf(TLC.originY, TLC.frontY, y)
                             : null;
                         TLC.spots.push({ x, y, rf });
                         break;
                     case "lane":
+                        TLC.pushUndo();
                         TLC.laneX = x;
                         TLC.laneWidth = parseInt(document.getElementById("lane-width").value) || 20;
                         break;
@@ -557,6 +684,71 @@
                 updateChart();
             });
 
+            // ---- Undo ----
+            document.getElementById("undo-btn").addEventListener("click", () => {
+                if (TLC.undo()) {
+                    TLC.redraw(canvas);
+                    updateRfTable();
+                    updateChart();
+                }
+            });
+
+            document.addEventListener("keydown", (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+                    e.preventDefault();
+                    if (TLC.undo()) {
+                        TLC.redraw(canvas);
+                        updateRfTable();
+                        updateChart();
+                    }
+                }
+            });
+
+            // ---- Rotation ----
+            document.getElementById("rotate-cw").addEventListener("click", () => {
+                TLC.rotateImage(canvas, 90);
+                updateRfTable();
+                updateChart();
+            });
+
+            document.getElementById("rotate-ccw").addEventListener("click", () => {
+                TLC.rotateImage(canvas, -90);
+                updateRfTable();
+                updateChart();
+            });
+
+            // ---- Save Image ----
+            document.getElementById("save-image-btn").addEventListener("click", () => {
+                if (!TLC.originalImageData) return;
+                TLC.redraw(canvas);
+                const link = document.createElement("a");
+                link.download = "TLC_analysis.png";
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            });
+
+            // ---- Label Settings ----
+            document.getElementById("label-font-size").addEventListener("input", (e) => {
+                TLC.labelFontSize = parseInt(e.target.value) || 13;
+                TLC.redraw(canvas);
+            });
+
+            document.getElementById("label-color").addEventListener("input", (e) => {
+                TLC.labelColor = e.target.value;
+                TLC.redraw(canvas);
+            });
+
+            document.getElementById("label-orientation").addEventListener("change", (e) => {
+                TLC.labelOrientation = e.target.value;
+                TLC.redraw(canvas);
+            });
+
+            document.getElementById("label-decimals").addEventListener("input", (e) => {
+                TLC.labelDecimals = parseInt(e.target.value) || 0;
+                TLC.redraw(canvas);
+                updateRfTable();
+            });
+
             // ---- Rf Table ----
             function updateRfTable() {
                 rfTbody.innerHTML = "";
@@ -570,9 +762,22 @@
                     const td1 = document.createElement("td");
                     td1.textContent = i + 1;
                     const td2 = document.createElement("td");
-                    td2.textContent = s.rf != null ? s.rf.toFixed(3) : "—";
+                    td2.textContent = s.rf != null ? s.rf.toFixed(TLC.labelDecimals) : "—";
+                    const td3 = document.createElement("td");
+                    const delBtn = document.createElement("button");
+                    delBtn.className = "spot-delete-btn";
+                    delBtn.textContent = "×";
+                    delBtn.title = "Delete spot";
+                    delBtn.addEventListener("click", () => {
+                        TLC.deleteSpot(i);
+                        TLC.redraw(canvas);
+                        updateRfTable();
+                        updateChart();
+                    });
+                    td3.appendChild(delBtn);
                     tr.appendChild(td1);
                     tr.appendChild(td2);
+                    tr.appendChild(td3);
                     rfTbody.appendChild(tr);
                 });
             }
