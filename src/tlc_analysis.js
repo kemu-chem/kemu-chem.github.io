@@ -538,38 +538,32 @@
                     ctx.fillText("Plate " + (i + 1), r.x + 4, r.y - 4);
                     ctx.restore();
 
-                    // Clip annotations to plate rect
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.rect(r.x, r.y, r.w, r.h);
-                    ctx.clip();
                     if (plate.originY !== null) {
-                        this._drawHLine(ctx, plate.originY, "#22c55e", "Origin");
+                        this._drawHLine(ctx, plate.originY, "#22c55e", "Origin", r);
                     }
                     if (plate.frontY !== null) {
-                        this._drawHLine(ctx, plate.frontY, "#ef4444", "Front");
+                        this._drawHLine(ctx, plate.frontY, "#ef4444", "Front", r);
                     }
                     plate.spots.forEach((s, j) => {
-                        this._drawSpot(ctx, s.x, s.y, j + 1, s.rf);
+                        this._drawSpot(ctx, s, j + 1, r);
                     });
                     if (plate.laneX !== null) {
-                        this._drawVLine(ctx, plate.laneX, "#8b5cf6", "Lane");
+                        this._drawVLine(ctx, plate.laneX, "#8b5cf6", "Lane", r);
                     }
-                    ctx.restore();
                 });
             } else {
                 // Flat mode: draw annotations on full image
                 if (this.originY !== null) {
-                    this._drawHLine(ctx, this.originY, "#22c55e", "Origin");
+                    this._drawHLine(ctx, this.originY, "#22c55e", "Origin", null);
                 }
                 if (this.frontY !== null) {
-                    this._drawHLine(ctx, this.frontY, "#ef4444", "Front");
+                    this._drawHLine(ctx, this.frontY, "#ef4444", "Front", null);
                 }
                 this.spots.forEach((s, i) => {
-                    this._drawSpot(ctx, s.x, s.y, i + 1, s.rf);
+                    this._drawSpot(ctx, s, i + 1, null);
                 });
                 if (this.laneX !== null) {
-                    this._drawVLine(ctx, this.laneX, "#8b5cf6", "Lane");
+                    this._drawVLine(ctx, this.laneX, "#8b5cf6", "Lane", null);
                 }
             }
 
@@ -591,39 +585,46 @@
             }
         },
 
-        _drawHLine(ctx, y, color, label) {
+        _drawHLine(ctx, y, color, label, bounds) {
+            const x0 = bounds ? bounds.x : 0;
+            const x1 = bounds ? bounds.x + bounds.w : this.canvasWidth;
             ctx.save();
             ctx.strokeStyle = color;
             ctx.lineWidth = 2;
             ctx.setLineDash([8, 4]);
             ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(this.canvasWidth, y);
+            ctx.moveTo(x0, y);
+            ctx.lineTo(x1, y);
             ctx.stroke();
             ctx.setLineDash([]);
             ctx.fillStyle = color;
             ctx.font = "bold 14px sans-serif";
-            ctx.fillText(label, 5, y - 5);
+            ctx.fillText(label, x0 + 5, y - 5);
             ctx.restore();
         },
 
-        _drawVLine(ctx, x, color, label) {
+        _drawVLine(ctx, x, color, label, bounds) {
+            const y0 = bounds ? bounds.y : 0;
+            const y1 = bounds ? bounds.y + bounds.h : this.canvasHeight;
             ctx.save();
             ctx.strokeStyle = color;
             ctx.lineWidth = 2;
             ctx.setLineDash([6, 4]);
             ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, this.canvasHeight);
+            ctx.moveTo(x, y0);
+            ctx.lineTo(x, y1);
             ctx.stroke();
             ctx.setLineDash([]);
             ctx.fillStyle = color;
             ctx.font = "bold 14px sans-serif";
-            ctx.fillText(label, x + 5, 15);
+            ctx.fillText(label, x + 5, y0 + 15);
             ctx.restore();
         },
 
-        _drawSpot(ctx, x, y, num, rf) {
+        _drawSpot(ctx, spot, num, bounds) {
+            const x = spot.x;
+            const y = spot.y;
+            const rf = spot.rf;
             const color = this.labelColor;
             const fontSize = this.labelFontSize;
             const decimals = this.labelDecimals;
@@ -638,16 +639,113 @@
 
             ctx.fillStyle = color;
             ctx.font = `bold ${fontSize}px sans-serif`;
-            const label = rf != null ? `#${num} Rf=${rf.toFixed(decimals)}` : `#${num}`;
+            const labelStr = rf != null ? `#${num} Rf=${rf.toFixed(decimals)}` : `#${num}`;
+
+            const rightEdge = bounds ? bounds.x + bounds.w : this.canvasWidth;
+            const leftEdge = bounds ? bounds.x : 0;
+            const labelWidth = ctx.measureText(labelStr).width;
+
+            const dx = spot.labelDx || 0;
+            const dy = spot.labelDy || 0;
+            const renderX = x + dx;
+            const renderY = y + dy;
+
+            if (dx !== 0 || dy !== 0) {
+                ctx.save();
+                ctx.strokeStyle = color;
+                ctx.globalAlpha = 0.5;
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(renderX, renderY);
+                ctx.stroke();
+                ctx.restore();
+            }
 
             if (vertical) {
-                ctx.translate(x, y - 14);
-                ctx.rotate(-Math.PI / 2);
-                ctx.fillText(label, 0, 0);
+                const topEdge = bounds ? bounds.y : 0;
+                // if it goes too far up, draw it downwards
+                if (renderY - 14 - labelWidth < topEdge) {
+                    ctx.translate(renderX, renderY + 14);
+                    ctx.rotate(Math.PI / 2);
+                    ctx.fillText(labelStr, 0, 0);
+                    spot._hitRect = { x: renderX - fontSize / 2, y: renderY + 14, w: fontSize, h: labelWidth };
+                } else {
+                    ctx.translate(renderX, renderY - 14);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.fillText(labelStr, 0, 0);
+                    spot._hitRect = { x: renderX - fontSize / 2, y: renderY - 14 - labelWidth, w: fontSize, h: labelWidth };
+                }
             } else {
-                ctx.fillText(label, x + 14, y + 4);
+                // If it goes too far right, flip it to the left side
+                if (renderX + 14 + labelWidth > rightEdge && renderX - 14 - labelWidth >= leftEdge) {
+                    ctx.textAlign = "right";
+                    ctx.fillText(labelStr, renderX - 14, renderY + 4);
+                    spot._hitRect = { x: renderX - 14 - labelWidth, y: renderY + 4 - fontSize, w: labelWidth, h: fontSize };
+                } else {
+                    ctx.textAlign = "left";
+                    ctx.fillText(labelStr, renderX + 14, renderY + 4);
+                    spot._hitRect = { x: renderX + 14, y: renderY + 4 - fontSize, w: labelWidth, h: fontSize };
+                }
+            }
+
+            if (spot._hitRect) {
+                spot._hitRect.x -= 10;
+                spot._hitRect.y -= 10;
+                spot._hitRect.w += 20;
+                spot._hitRect.h += 20;
             }
             ctx.restore();
+        },
+
+        hitTestLabel(x, y) {
+            const checkSpots = (spots) => {
+                for (let si = spots.length - 1; si >= 0; si--) {
+                    const s = spots[si];
+                    if (s._hitRect && x >= s._hitRect.x && x <= s._hitRect.x + s._hitRect.w && y >= s._hitRect.y && y <= s._hitRect.y + s._hitRect.h) {
+                        return s;
+                    }
+                }
+                return null;
+            };
+
+            if (this.plates.length > 0) {
+                for (let pi = this.plates.length - 1; pi >= 0; pi--) {
+                    const hit = checkSpots(this.plates[pi].spots);
+                    if (hit) return hit;
+                }
+            } else {
+                return checkSpots(this.spots);
+            }
+            return null;
+        },
+
+        hitTestSpot(x, y) {
+            const hitRadius = 15; // easier to click than exactly 10
+            const checkSpots = (spots, plateRef = null) => {
+                for (let si = spots.length - 1; si >= 0; si--) {
+                    const s = spots[si];
+                    const dx = x - s.x;
+                    const dy = y - s.y;
+                    if (dx * dx + dy * dy <= hitRadius * hitRadius) {
+                        s._plateRef = plateRef;
+                        return s;
+                    }
+                }
+                return null;
+            };
+
+            if (this.plates.length > 0) {
+                for (let pi = this.plates.length - 1; pi >= 0; pi--) {
+                    const plate = this.plates[pi];
+                    const hit = checkSpots(plate.spots, plate);
+                    if (hit) return hit;
+                }
+            } else {
+                return checkSpots(this.spots);
+            }
+            return null;
         },
 
         // ---- Canvas Coordinate Helper ----

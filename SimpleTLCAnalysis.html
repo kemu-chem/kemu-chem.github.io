@@ -422,12 +422,13 @@
 </head>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-10LFVJ13WS"></script>
 <script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
 
-  gtag('config', 'G-10LFVJ13WS');
+    gtag('config', 'G-10LFVJ13WS');
 </script>
+
 <body>
     <div class="card">
         <a href="index.html" class="portal-btn">&#8592; Portal</a>
@@ -553,7 +554,7 @@
         <a href="index.html">&larr; Back to Tools</a>
     </div>
 
-    <script src="src/tlc_analysis.js"></script>
+    <script src="src/tlc_analysis.js?v=4"></script>
     <script>
         (function () {
             "use strict";
@@ -691,6 +692,7 @@
 
             // ---- Canvas Click ----
             canvas.addEventListener("click", (e) => {
+                if (TLC._justDraggedLabel) return;
                 if (!TLC.originalImageData) return;
                 if (TLC.interactionMode === "crop") return;
                 const { x, y } = TLC.getCanvasCoords(canvas, e);
@@ -870,9 +872,9 @@
                 link.click();
             });
 
-            // ---- Crop (mouse + touch) ----
+            // ---- Label Drag & Crop (mouse + touch) ----
             function getCropCoords(e) {
-                if (e.touches) {
+                if (e.touches && e.touches.length > 0) {
                     const t = e.touches[0];
                     const rect = canvas.getBoundingClientRect();
                     const scaleX = canvas.width / rect.width;
@@ -885,50 +887,141 @@
                 return TLC.getCanvasCoords(canvas, e);
             }
 
+            TLC._draggedSpot = null;
+            TLC._draggedLabelSpot = null;
+            TLC._dragStartX = 0;
+            TLC._dragStartY = 0;
+            TLC._dragInitDx = 0;
+            TLC._dragInitDy = 0;
+            TLC._justDraggedLabel = false;
+
+            function handlePointerDown(e) {
+                if (!TLC.originalImageData) return false;
+                const coords = getCropCoords(e);
+
+                // 1. Check if dragging a spot (the dot itself)
+                const hitSpot = TLC.hitTestSpot(coords.x, coords.y);
+                if (hitSpot && TLC.interactionMode !== "crop") {
+                    TLC.pushUndo(); // Save state before moving
+                    TLC._draggedSpot = hitSpot;
+                    return true;
+                }
+
+                // 2. Check if dragging a label
+                const hit = TLC.hitTestLabel(coords.x, coords.y);
+                if (hit && TLC.interactionMode !== "crop") {
+                    // Start dragging without recording undo yet (can be noisy)
+                    TLC._draggedLabelSpot = hit;
+                    TLC._dragStartX = coords.x;
+                    TLC._dragStartY = coords.y;
+                    TLC._dragInitDx = hit.labelDx || 0;
+                    TLC._dragInitDy = hit.labelDy || 0;
+                    return true;
+                }
+
+                // 3. Otherwise start crop if in crop mode
+                if (TLC.interactionMode === "crop") {
+                    TLC.startCrop(coords.x, coords.y);
+                    addPlateBtn.hidden = true;
+                    return true;
+                }
+                return false;
+            }
+
+            function handlePointerMove(e) {
+                if (!TLC.originalImageData) return false;
+                const coords = getCropCoords(e);
+
+                if (TLC._draggedSpot) {
+                    TLC._justDraggedLabel = true;
+                    TLC._draggedSpot.x = coords.x;
+                    TLC._draggedSpot.y = coords.y;
+
+                    // Recalculate Rf dynamically while dragging
+                    let originY = null, frontY = null;
+                    if (TLC.plates.length > 0) {
+                        const plate = TLC.getActivePlate();
+                        if (plate) {
+                            originY = plate.originY;
+                            frontY = plate.frontY;
+                        }
+                    } else {
+                        originY = TLC.originY;
+                        frontY = TLC.frontY;
+                    }
+
+                    if (originY !== null && frontY !== null) {
+                        TLC._draggedSpot.rf = TLC.calculateRf(originY, frontY, coords.y);
+                    }
+
+                    TLC.redraw(canvas);
+                    updateRfTable();
+                    updateChart();
+                    return true;
+                }
+
+                if (TLC._draggedLabelSpot) {
+                    TLC._justDraggedLabel = true;
+                    TLC._draggedLabelSpot.labelDx = TLC._dragInitDx + (coords.x - TLC._dragStartX);
+                    TLC._draggedLabelSpot.labelDy = TLC._dragInitDy + (coords.y - TLC._dragStartY);
+                    TLC.redraw(canvas);
+                    return true;
+                }
+
+                if (TLC.interactionMode === "crop" && TLC._cropStart) {
+                    TLC.updateCrop(coords.x, coords.y);
+                    TLC.redraw(canvas);
+                    return true;
+                }
+                return false;
+            }
+
+            function handlePointerUp() {
+                if (TLC._draggedSpot) {
+                    TLC._draggedSpot = null;
+                    setTimeout(() => TLC._justDraggedLabel = false, 50);
+                    return true;
+                }
+
+                if (TLC._draggedLabelSpot) {
+                    TLC._draggedLabelSpot = null;
+                    // Reset the flag shortly after to consume the native click event
+                    setTimeout(() => TLC._justDraggedLabel = false, 50);
+                    return true;
+                }
+
+                if (TLC.interactionMode === "crop" && TLC._cropStart) {
+                    TLC._cropStart = null;
+                    if (TLC.cropRect && TLC.cropRect.w > 10 && TLC.cropRect.h > 10) {
+                        addPlateBtn.hidden = false;
+                    }
+                    return true;
+                }
+                return false;
+            }
+
             canvas.addEventListener("mousedown", (e) => {
-                if (TLC.interactionMode !== "crop" || !TLC.originalImageData) return;
-                const { x, y } = getCropCoords(e);
-                TLC.startCrop(x, y);
-                addPlateBtn.hidden = true;
+                if (handlePointerDown(e)) e.preventDefault();
             });
 
             canvas.addEventListener("mousemove", (e) => {
-                if (TLC.interactionMode !== "crop" || !TLC._cropStart) return;
-                const { x, y } = getCropCoords(e);
-                TLC.updateCrop(x, y);
-                TLC.redraw(canvas);
+                if (handlePointerMove(e)) e.preventDefault();
             });
 
             canvas.addEventListener("mouseup", () => {
-                if (TLC.interactionMode !== "crop" || !TLC._cropStart) return;
-                TLC._cropStart = null;
-                if (TLC.cropRect && TLC.cropRect.w > 10 && TLC.cropRect.h > 10) {
-                    addPlateBtn.hidden = false;
-                }
+                handlePointerUp();
             });
 
             canvas.addEventListener("touchstart", (e) => {
-                if (TLC.interactionMode !== "crop" || !TLC.originalImageData) return;
-                e.preventDefault();
-                const { x, y } = getCropCoords(e);
-                TLC.startCrop(x, y);
-                addPlateBtn.hidden = true;
+                if (handlePointerDown(e)) e.preventDefault();
             }, { passive: false });
 
             canvas.addEventListener("touchmove", (e) => {
-                if (TLC.interactionMode !== "crop" || !TLC._cropStart) return;
-                e.preventDefault();
-                const { x, y } = getCropCoords(e);
-                TLC.updateCrop(x, y);
-                TLC.redraw(canvas);
+                if (handlePointerMove(e)) e.preventDefault();
             }, { passive: false });
 
-            canvas.addEventListener("touchend", () => {
-                if (TLC.interactionMode !== "crop" || !TLC.cropRect) return;
-                TLC._cropStart = null;
-                if (TLC.cropRect.w > 10 && TLC.cropRect.h > 10) {
-                    addPlateBtn.hidden = false;
-                }
+            canvas.addEventListener("touchend", (e) => {
+                handlePointerUp();
             });
 
             addPlateBtn.addEventListener("click", () => {
@@ -1085,14 +1178,19 @@
 
                 if (laneX === null || originY === null || frontY === null) {
                     noLaneMsg.hidden = !(laneX === null);
-                    TLC.drawIntensityChart(chartCanvas, [], spots);
+                    TLC.drawIntensityChart(chartCanvas, [], []);
                     return;
                 }
                 noLaneMsg.hidden = true;
                 const profile = TLC.getIntensityProfile(
                     canvas, laneX, lw, frontY, originY
                 );
-                TLC.drawIntensityChart(chartCanvas, profile, spots);
+
+                // Only show spots in the chart that are near the lane to prevent cluster overlaps
+                const proximityLimit = Math.max(lw * 1.5, 30);
+                const laneSpots = spots.filter(s => Math.abs(s.x - laneX) <= proximityLimit);
+
+                TLC.drawIntensityChart(chartCanvas, profile, laneSpots);
             }
 
             // Resize chart on window resize
