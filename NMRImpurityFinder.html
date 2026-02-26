@@ -1082,13 +1082,40 @@
                         }
                     });
 
-                    if (hasMatch) {
-                        peakGroups.forEach((g) => {
-                            if (!g.classList.contains('highlighted')) {
-                                g.classList.add('dimmed');
+                    // Fallback to nearest peak if numeric search has no exact match
+                    if (isNumeric && numVal !== null && !hasMatch) {
+                        const fallbackTolerance = 0.3; // Allow up to 0.3 ppm distance
+                        let closestEntry = null;
+                        let minDiff = Infinity;
+
+                        currentEntries.forEach(entry => {
+                            let diff = Math.abs(entry.shiftMid - numVal);
+                            if (entry.isRange) {
+                                if (numVal >= entry.shiftMin && numVal <= entry.shiftMax) diff = 0;
+                                else diff = Math.min(Math.abs(entry.shiftMin - numVal), Math.abs(entry.shiftMax - numVal));
+                            }
+                            if (diff < minDiff) {
+                                minDiff = diff;
+                                closestEntry = entry;
                             }
                         });
+
+                        if (closestEntry && minDiff <= fallbackTolerance) {
+                            const g = peakGroups.get(closestEntry.id);
+                            if (g) {
+                                g.classList.add('highlighted');
+                                hasMatch = true;
+                            }
+                        }
                     }
+
+                    // Always dim non-highlighted peaks when searching.
+                    // If no match at all, dim everything to indicate "not found".
+                    peakGroups.forEach((g) => {
+                        if (!g.classList.contains('highlighted')) {
+                            g.classList.add('dimmed');
+                        }
+                    });
                 }
 
                 function highlightCommon(active) {
