@@ -17,5 +17,6 @@ extract_tables.py
 generate_json.py
 data/extracted_csv/
 data/nmr-data.csv
+data/*.tif
 .overview
 tmp_tlc.js
