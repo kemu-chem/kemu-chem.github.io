@@ -36,7 +36,10 @@
             font-size: 14px;
         }
 
-        .input-section button:hover { opacity: 0.9; }
+        .input-section button:hover {
+            opacity: 0.9;
+        }
+
         .input-section button:disabled {
             background: #94a3b8;
             border-color: #94a3b8;
@@ -47,8 +50,15 @@
             font-size: 13px;
             color: #94a3b8;
         }
-        #cv-status.ready { color: #16a34a; font-weight: bold; }
-        #cv-status.error { color: #dc2626; }
+
+        #cv-status.ready {
+            color: #16a34a;
+            font-weight: bold;
+        }
+
+        #cv-status.error {
+            color: #dc2626;
+        }
 
         /* Canvas area */
         .canvas-area {
@@ -133,7 +143,9 @@
             flex-shrink: 0;
         }
 
-        .slider-row input[type="range"] { flex: 1; }
+        .slider-row input[type="range"] {
+            flex: 1;
+        }
 
         .slider-val {
             width: 48px;
@@ -232,12 +244,14 @@
 
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-QQYR2QR1LP"></script>
 <script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
 
-  gtag('config', 'G-QQYR2QR1LP');
-</script><body>
+    gtag('config', 'G-QQYR2QR1LP');
+</script>
+
+<body>
     <div class="card">
         <a href="index.html" class="portal-btn">&#8592; Portal</a>
         <h1>Cell Counter</h1>
@@ -246,7 +260,7 @@
         <!-- Image input -->
         <div class="input-section">
             <button id="load-btn" disabled onclick="document.getElementById('file-input').click()">Load Image</button>
-            <input type="file" id="file-input" accept="image/*" hidden>
+            <input type="file" id="file-input" accept="image/*,.tif,.tiff" hidden>
             <span id="cv-status">Loading OpenCV.js...</span>
         </div>
 
@@ -293,6 +307,7 @@
             <div class="check-row">
                 <label><input type="checkbox" id="otsu"> Otsu auto-threshold</label>
                 <label><input type="checkbox" id="invert" checked> Invert (dark cells on light bg)</label>
+                <label><input type="checkbox" id="negative"> Negative Image</label>
             </div>
 
             <hr class="section-divider">
@@ -348,8 +363,12 @@
 
     <div class="page-footer">Cell Counter &mdash; Lab Tools</div>
 
+    <!-- UTIF.js for TIFF support -->
+    <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js"></script>
+
     <!-- OpenCV.js (async, ~8 MB) -->
-    <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js" onload="onOpenCvReady()" onerror="onOpenCvError()"></script>
+    <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js"
+        onload="onOpenCvReady()" onerror="onOpenCvError()"></script>
 
     <script>
         let cvReady = false;
@@ -389,25 +408,57 @@
         dropZone.addEventListener('click', () => document.getElementById('file-input').click());
 
         function loadImage(file) {
-            const reader = new FileReader();
-            reader.onload = e => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvOrig = document.getElementById('canvas-orig');
-                    canvOrig.width = img.width;
-                    canvOrig.height = img.height;
-                    canvOrig.getContext('2d').drawImage(img, 0, 0);
+            const isTiff = file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff');
 
-                    dropZone.style.display = 'none';
-                    document.getElementById('canvas-area').hidden = false;
-                    imageLoaded = true;
+            if (isTiff) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    try {
+                        const buffer = e.target.result;
+                        const ifds = UTIF.decode(buffer);
+                        UTIF.decodeImage(buffer, ifds[0]);
+                        const rgba = UTIF.toRGBA8(ifds[0]);
 
-                    if (cvReady) processImage();
-                    else document.getElementById('result-note').textContent = 'Waiting for OpenCV.js to finish loading…';
+                        const canvOrig = document.getElementById('canvas-orig');
+                        canvOrig.width = ifds[0].width;
+                        canvOrig.height = ifds[0].height;
+                        const ctx = canvOrig.getContext('2d');
+                        const imageData = new ImageData(new Uint8ClampedArray(rgba), ifds[0].width, ifds[0].height);
+                        ctx.putImageData(imageData, 0, 0);
+
+                        dropZone.style.display = 'none';
+                        document.getElementById('canvas-area').hidden = false;
+                        imageLoaded = true;
+
+                        if (cvReady) processImage();
+                        else document.getElementById('result-note').textContent = 'Waiting for OpenCV.js to finish loading…';
+                    } catch (err) {
+                        console.error('Error loading TIFF:', err);
+                        alert('Could not load TIFF image. It might be an unsupported compression format.');
+                    }
                 };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+                reader.readAsArrayBuffer(file);
+            } else {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvOrig = document.getElementById('canvas-orig');
+                        canvOrig.width = img.width;
+                        canvOrig.height = img.height;
+                        canvOrig.getContext('2d').drawImage(img, 0, 0);
+
+                        dropZone.style.display = 'none';
+                        document.getElementById('canvas-area').hidden = false;
+                        imageLoaded = true;
+
+                        if (cvReady) processImage();
+                        else document.getElementById('result-note').textContent = 'Waiting for OpenCV.js to finish loading…';
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
         }
 
         // ── View toggle ───────────────────────────────────────────────────
@@ -436,7 +487,7 @@
             scheduleProcess();
         });
 
-        ['invert', 'show-labels'].forEach(id =>
+        ['invert', 'show-labels', 'negative'].forEach(id =>
             document.getElementById(id).addEventListener('change', scheduleProcess));
         ['min-area', 'max-area'].forEach(id =>
             document.getElementById(id).addEventListener('input', scheduleProcess));
@@ -456,6 +507,7 @@
             const threshVal = parseInt(document.getElementById('thresh').value);
             const useOtsu = document.getElementById('otsu').checked;
             const invert = document.getElementById('invert').checked;
+            const isNegative = document.getElementById('negative').checked;
             const openIter = parseInt(document.getElementById('morph-open').value);
             const closeIter = parseInt(document.getElementById('morph-close').value);
             const minArea = parseFloat(document.getElementById('min-area').value) || 1;
@@ -469,6 +521,15 @@
 
             try {
                 src = cv.imread(canvOrig);
+
+                if (isNegative) {
+                    let temp = new cv.Mat();
+                    cv.cvtColor(src, temp, cv.COLOR_RGBA2RGB);
+                    cv.bitwise_not(temp, temp);
+                    cv.cvtColor(temp, src, cv.COLOR_RGB2RGBA);
+                    temp.delete();
+                }
+
                 gray = new cv.Mat();
                 blurred = new cv.Mat();
                 binary = new cv.Mat();
@@ -589,6 +650,9 @@
             }
         }
     </script>
-    <script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="kemuchem" data-description="Support me on Buy me a coffee!" data-message="" data-color="#FF5F5F" data-position="Right" data-x_margin="18" data-y_margin="18"></script>
+    <script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
+        data-id="kemuchem" data-description="Support me on Buy me a coffee!" data-message="" data-color="#FF5F5F"
+        data-position="Right" data-x_margin="18" data-y_margin="18"></script>
 </body>
+
 </html>
