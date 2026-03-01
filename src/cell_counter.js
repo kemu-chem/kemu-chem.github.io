@@ -94,7 +94,7 @@ function loadImage(file) {
                 canvOrig.getContext('2d').putImageData(
                     new ImageData(new Uint8ClampedArray(rgba), ifds[0].width, ifds[0].height), 0, 0);
 
-                _afterImageLoad();
+                _afterImageLoad(file.name);
             } catch (err) {
                 console.error('Error loading TIFF:', err);
                 alert('Could not load TIFF image. It might be an unsupported compression format.');
@@ -110,7 +110,7 @@ function loadImage(file) {
                 canvOrig.width = img.width;
                 canvOrig.height = img.height;
                 canvOrig.getContext('2d').drawImage(img, 0, 0);
-                _afterImageLoad();
+                _afterImageLoad(file.name);
             };
             img.src = e.target.result;
         };
@@ -118,8 +118,12 @@ function loadImage(file) {
     }
 }
 
-function _afterImageLoad() {
-    dropZone.style.display = 'none';
+function _afterImageLoad(filename) {
+    // Switch drop zone to compact 'loaded' state (keep visible for re-drop)
+    dropZone.classList.add('loaded');
+    dropZone.innerHTML =
+        `<span class="dz-filename">🖼️ ${filename || 'image'}</span>` +
+        `<span class="dz-hint">Drop or click to replace</span>`;
     document.getElementById('canvas-area').hidden = false;
     imageLoaded = true;
     syncChannelCanvasSizes();
