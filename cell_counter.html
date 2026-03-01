@@ -6,431 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cell Counter</title>
     <link rel="stylesheet" href="main_style.css">
-    <style>
-        h1 {
-            margin-top: 0;
-            color: #333;
-        }
-
-        .subtitle {
-            color: #777;
-            margin-bottom: 20px;
-        }
-
-        /* Input section */
-        .input-section {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        .input-section button {
-            padding: 10px 20px;
-            border: 1px solid var(--primary);
-            background: var(--primary);
-            color: white;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .input-section button:hover {
-            opacity: 0.9;
-        }
-
-        .input-section button:disabled {
-            background: #94a3b8;
-            border-color: #94a3b8;
-            cursor: not-allowed;
-        }
-
-        #cv-status {
-            font-size: 13px;
-            color: #94a3b8;
-        }
-
-        #cv-status.ready {
-            color: #16a34a;
-            font-weight: bold;
-        }
-
-        #cv-status.error {
-            color: #dc2626;
-        }
-
-        /* Canvas area */
-        .canvas-rows-wrap {
-            margin-bottom: 10px;
-        }
-
-        /* Overlay container: stacks Row1 and Row2 */
-        .overlay-container {
-            position: relative;
-        }
-
-        .canvas-row {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 8px;
-        }
-
-        /* Row2 in overlay mode: absolute on top of Row1 */
-        .canvas-row.overlay-mode {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            pointer-events: none;
-        }
-
-        /* Spacer keeps the overlay-container the height of Row1 */
-        .row1-spacer {
-            visibility: hidden;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 8px;
-        }
-
-        .canvas-panel {
-            flex: 1;
-            min-width: 180px;
-        }
-
-        .canvas-panel-label {
-            font-size: 12px;
-            font-weight: bold;
-            color: #555;
-            margin-bottom: 3px;
-        }
-
-        .canvas-panel-label.ch-r {
-            color: #dc2626;
-        }
-
-        .canvas-panel-label.ch-g {
-            color: #16a34a;
-        }
-
-        .canvas-panel-label.ch-b {
-            color: #2563eb;
-        }
-
-        .canvas-panel-label.mask {
-            font-weight: normal;
-            color: #888;
-        }
-
-        .canvas-panel canvas {
-            max-width: 100%;
-            border: 1px solid #e2e8f0;
-            border-radius: 4px;
-            display: block;
-        }
-
-        /* Overlay toolbar */
-        .overlay-toolbar {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 10px;
-            flex-wrap: wrap;
-        }
-
-        #overlay-btn {
-            padding: 5px 14px;
-            border: 1px solid #cbd5e1;
-            background: #f8fafc;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            white-space: nowrap;
-        }
-
-        #overlay-btn.active {
-            background: #6366f1;
-            color: white;
-            border-color: #6366f1;
-        }
-
-        .opacity-label {
-            font-size: 12px;
-            color: #555;
-            white-space: nowrap;
-        }
-
-        #opacity-slider {
-            width: 120px;
-        }
-
-        #opacity-val {
-            font-size: 12px;
-            font-weight: bold;
-            color: #444;
-            width: 36px;
-        }
-
-        /* Hide opacity control when not in overlay mode */
-        .opacity-ctrl {
-            display: none;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .opacity-ctrl.visible {
-            display: flex;
-        }
-
-        .no-image-msg {
-            color: #94a3b8;
-            padding: 60px 20px;
-            border: 2px dashed #cbd5e1;
-            border-radius: 8px;
-            text-align: center;
-            margin-bottom: 15px;
-        }
-
-        /* View toggle buttons */
-        .view-toggle {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 4px;
-        }
-
-        .view-btn {
-            padding: 4px 10px;
-            border: 1px solid #cbd5e1;
-            background: #f8fafc;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 11px;
-        }
-
-        .view-btn.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
-
-        /* Controls */
-        .controls {
-            margin-bottom: 20px;
-        }
-
-        .controls h3 {
-            margin: 0 0 12px;
-            color: #333;
-            font-size: 1em;
-        }
-
-        .slider-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 8px;
-        }
-
-        .slider-row label {
-            width: 110px;
-            font-size: 13px;
-            color: #555;
-            flex-shrink: 0;
-        }
-
-        .slider-row input[type="range"] {
-            flex: 1;
-        }
-
-        .slider-val {
-            width: 48px;
-            text-align: right;
-            font-size: 13px;
-            font-weight: bold;
-            color: #444;
-            flex-shrink: 0;
-        }
-
-        .check-row {
-            display: flex;
-            align-items: center;
-            gap: 18px;
-            margin-bottom: 10px;
-            flex-wrap: wrap;
-        }
-
-        /* Channel parameter tabs */
-        .ch-params-section {
-            margin-top: 4px;
-        }
-
-        .ch-tabs {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 10px;
-        }
-
-        .ch-tab {
-            padding: 5px 16px;
-            border: 1px solid #cbd5e1;
-            background: #f8fafc;
-            border-radius: 4px 4px 0 0;
-            border-bottom: none;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: bold;
-        }
-
-        .ch-tab[data-ch="r"] {
-            color: #dc2626;
-        }
-
-        .ch-tab[data-ch="g"] {
-            color: #16a34a;
-        }
-
-        .ch-tab[data-ch="b"] {
-            color: #2563eb;
-        }
-
-        .ch-tab.active[data-ch="r"] {
-            background: #fee2e2;
-            border-color: #fca5a5;
-        }
-
-        .ch-tab.active[data-ch="g"] {
-            background: #dcfce7;
-            border-color: #86efac;
-        }
-
-        .ch-tab.active[data-ch="b"] {
-            background: #dbeafe;
-            border-color: #93c5fd;
-        }
-
-        .ch-panel {
-            display: none;
-            border: 1px solid #e2e8f0;
-            border-radius: 0 4px 4px 4px;
-            padding: 12px;
-            background: #fafafa;
-        }
-
-        .ch-panel.active {
-            display: block;
-        }
-
-        .ch-panel[data-ch="r"].active {
-            border-color: #fca5a5;
-            background: #fff8f8;
-        }
-
-        .ch-panel[data-ch="g"].active {
-            border-color: #86efac;
-            background: #f8fff8;
-        }
-
-        .ch-panel[data-ch="b"].active {
-            border-color: #93c5fd;
-            background: #f8f8ff;
-        }
-
-        .ch-enabled-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-
-        .ch-enabled-row label {
-            font-size: 13px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .ch-body.disabled {
-            opacity: 0.4;
-            pointer-events: none;
-        }
-
-        .check-row label {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 13px;
-            color: #555;
-            cursor: pointer;
-        }
-
-        .area-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 8px;
-        }
-
-        .area-row label {
-            width: 110px;
-            font-size: 13px;
-            color: #555;
-            flex-shrink: 0;
-        }
-
-        .area-row input[type="number"] {
-            width: 90px;
-            padding: 4px 8px;
-            border: 1px solid #cbd5e1;
-            border-radius: 4px;
-            font-size: 13px;
-        }
-
-        .section-divider {
-            border: none;
-            border-top: 1px solid #e2e8f0;
-            margin: 14px 0;
-        }
-
-        /* Result */
-        .result-box {
-            background: #f0fdf4;
-            border: 1px solid #86efac;
-            border-radius: 8px;
-            padding: 16px 24px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .result-count {
-            font-size: 3em;
-            font-weight: bold;
-            color: #16a34a;
-            line-height: 1;
-            min-width: 2ch;
-            text-align: right;
-        }
-
-        .result-label {
-            font-size: 15px;
-            color: #555;
-        }
-
-        .result-note {
-            font-size: 12px;
-            color: #94a3b8;
-            margin-top: 4px;
-        }
-
-        /* Footer */
-        .page-footer {
-            text-align: center;
-            margin-top: 20px;
-            color: #aaa;
-            font-size: 0.8em;
-        }
-    </style>
+    <link rel="stylesheet" href="src/cell_counter.css">
 </head>
 
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-QQYR2QR1LP"></script>
@@ -450,7 +26,7 @@
 
         <!-- Image input -->
         <div class="input-section">
-            <button id="load-btn" disabled onclick="document.getElementById('file-input').click()">Load Image</button>
+            <button id="load-btn" disabled>Load Image</button>
             <input type="file" id="file-input" accept="image/*,.tif,.tiff" hidden>
             <span id="cv-status">Loading OpenCV.js...</span>
         </div>
@@ -468,11 +44,10 @@
 
             <!-- Overlay toolbar -->
             <div class="overlay-toolbar">
-                <button id="overlay-btn" onclick="toggleOverlay()">⊕ Overlay Rows</button>
+                <button id="overlay-btn">⊕ Overlay Rows</button>
                 <div class="opacity-ctrl" id="opacity-ctrl">
                     <span class="opacity-label">Result opacity:</span>
-                    <input type="range" id="opacity-slider" min="0" max="100" value="60"
-                        oninput="updateOverlayOpacity()">
+                    <input type="range" id="opacity-slider" min="0" max="100" value="60">
                     <span id="opacity-val">60%</span>
                 </div>
             </div>
@@ -565,23 +140,23 @@
                 <div class="ch-panel active" data-ch="orig" id="ch-panel-orig">
                     <div class="slider-row">
                         <label for="orig-blur">Blur radius</label>
-                        <input type="range" id="orig-blur" min="1" max="21" step="2" value="3">
-                        <span class="slider-val" id="orig-blur-val">3</span>
+                        <input type="range" id="orig-blur" min="1" max="21" step="2" value="1">
+                        <span class="slider-val" id="orig-blur-val">1</span>
                     </div>
                     <div class="slider-row">
                         <label for="orig-morph-open">Open iterations</label>
-                        <input type="range" id="orig-morph-open" min="0" max="10" value="1">
-                        <span class="slider-val" id="orig-morph-open-val">1</span>
+                        <input type="range" id="orig-morph-open" min="0" max="10" value="0">
+                        <span class="slider-val" id="orig-morph-open-val">0</span>
                     </div>
                     <div class="slider-row">
                         <label for="orig-morph-close">Close iterations</label>
-                        <input type="range" id="orig-morph-close" min="0" max="10" value="1">
-                        <span class="slider-val" id="orig-morph-close-val">1</span>
+                        <input type="range" id="orig-morph-close" min="0" max="10" value="0">
+                        <span class="slider-val" id="orig-morph-close-val">0</span>
                     </div>
                     <hr class="section-divider">
                     <div class="area-row">
                         <label for="orig-min-area">Min area (px²)</label>
-                        <input type="number" id="orig-min-area" min="1" value="100">
+                        <input type="number" id="orig-min-area" min="1" value="1">
                     </div>
                     <div class="area-row">
                         <label for="orig-max-area">Max area (px²)</label>
@@ -589,8 +164,8 @@
                     </div>
                     <div class="slider-row">
                         <label for="orig-circ">Min circularity</label>
-                        <input type="range" id="orig-circ" min="0" max="100" value="30">
-                        <span class="slider-val" id="orig-circ-val">0.30</span>
+                        <input type="range" id="orig-circ" min="0" max="100" value="0">
+                        <span class="slider-val" id="orig-circ-val">0.00</span>
                     </div>
                     <hr class="section-divider">
                     <div class="check-row">
@@ -613,7 +188,7 @@
                                 area / circularity</label></div>
                         <div class="ch-body" id="ch-r-override-body">
                             <div class="area-row"><label for="ch-r-min-area">Min area (px²)</label><input type="number"
-                                    id="ch-r-min-area" min="1" value="100"></div>
+                                    id="ch-r-min-area" min="1" value="1"></div>
                             <div class="area-row"><label for="ch-r-max-area">Max area (px²)</label><input type="number"
                                     id="ch-r-max-area" min="1" value="10000"></div>
                             <div class="slider-row"><label for="ch-r-circ">Min circularity</label><input type="range"
@@ -638,7 +213,7 @@
                                 area / circularity</label></div>
                         <div class="ch-body" id="ch-g-override-body">
                             <div class="area-row"><label for="ch-g-min-area">Min area (px²)</label><input type="number"
-                                    id="ch-g-min-area" min="1" value="100"></div>
+                                    id="ch-g-min-area" min="1" value="1"></div>
                             <div class="area-row"><label for="ch-g-max-area">Max area (px²)</label><input type="number"
                                     id="ch-g-max-area" min="1" value="10000"></div>
                             <div class="slider-row"><label for="ch-g-circ">Min circularity</label><input type="range"
@@ -663,7 +238,7 @@
                                 area / circularity</label></div>
                         <div class="ch-body" id="ch-b-override-body">
                             <div class="area-row"><label for="ch-b-min-area">Min area (px²)</label><input type="number"
-                                    id="ch-b-min-area" min="1" value="100"></div>
+                                    id="ch-b-min-area" min="1" value="1"></div>
                             <div class="area-row"><label for="ch-b-max-area">Max area (px²)</label><input type="number"
                                     id="ch-b-max-area" min="1" value="10000"></div>
                             <div class="slider-row"><label for="ch-b-circ">Min circularity</label><input type="range"
@@ -676,14 +251,30 @@
             </div><!-- /ch-params-section -->
         </div>
 
-        <!-- Result -->
+        <!-- Conditional Count -->
+        <div class="controls" id="cond-count-section">
+            <h3>Conditional Count</h3>
+            <div id="cond-rules"></div>
+            <button id="cond-add-btn">＋ Add condition</button>
+        </div>
+
+        <!-- Result (grayscale) -->
         <div class="result-box">
             <div class="result-count" id="result-count">—</div>
             <div>
-                <div class="result-label">cells detected</div>
+                <div class="result-label">cells detected <span style="font-size:11px;color:#94a3b8;">(grayscale)</span>
+                </div>
                 <div class="result-note" id="result-note"></div>
             </div>
         </div>
+        <div class="result-save-row">
+            <select id="result-fmt">
+                <option value="png">PNG</option>
+                <option value="jpeg">JPEG</option>
+            </select>
+            <button id="result-save-btn">⬇ Save Result</button>
+        </div>
+
     </div>
 
     <div class="page-footer">Cell Counter &mdash; Lab Tools</div>
@@ -691,458 +282,13 @@
     <!-- UTIF.js for TIFF support -->
     <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js"></script>
 
-    <!-- OpenCV.js (async, ~8 MB) -->
-    <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js"
-        onload="onOpenCvReady()" onerror="onOpenCvError()"></script>
+    <!-- OpenCV.js (async, ~8 MB) — readiness detected via polling in cell_counter.js -->
+    <script async id="opencv-script"
+        src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js"
+        onerror="onOpenCvError()"></script>
 
-    <script>
-        let cvReady = false;
-        let currentView = 'overlay';
-        let debounceTimer = null;
-        let imageLoaded = false;
-
-        // ── OpenCV lifecycle ──────────────────────────────────────────────
-        function onOpenCvReady() {
-            cvReady = true;
-            const el = document.getElementById('cv-status');
-            el.textContent = 'OpenCV.js ready';
-            el.className = 'ready';
-            document.getElementById('load-btn').disabled = false;
-            if (imageLoaded) processImage();
-        }
-
-        function onOpenCvError() {
-            const el = document.getElementById('cv-status');
-            el.textContent = 'Failed to load OpenCV.js — check network connection';
-            el.className = 'error';
-        }
-
-        // ── File loading ──────────────────────────────────────────────────
-        document.getElementById('file-input').addEventListener('change', e => {
-            if (e.target.files[0]) loadImage(e.target.files[0]);
-        });
-
-        const dropZone = document.getElementById('drop_zone');
-        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
-        dropZone.addEventListener('drop', e => {
-            e.preventDefault();
-            dropZone.classList.remove('dragging');
-            if (e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]);
-        });
-        dropZone.addEventListener('click', () => document.getElementById('file-input').click());
-
-        function loadImage(file) {
-            const isTiff = file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff');
-
-            if (isTiff) {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    try {
-                        const buffer = e.target.result;
-                        const ifds = UTIF.decode(buffer);
-                        UTIF.decodeImage(buffer, ifds[0]);
-                        const rgba = UTIF.toRGBA8(ifds[0]);
-
-                        const canvOrig = document.getElementById('canvas-orig');
-                        canvOrig.width = ifds[0].width;
-                        canvOrig.height = ifds[0].height;
-                        const ctx = canvOrig.getContext('2d');
-                        const imageData = new ImageData(new Uint8ClampedArray(rgba), ifds[0].width, ifds[0].height);
-                        ctx.putImageData(imageData, 0, 0);
-
-                        dropZone.style.display = 'none';
-                        document.getElementById('canvas-area').hidden = false;
-                        imageLoaded = true;
-                        syncChannelCanvasSizes();
-
-                        if (cvReady) processImage();
-                        else document.getElementById('result-note').textContent = 'Waiting for OpenCV.js to finish loading…';
-                    } catch (err) {
-                        console.error('Error loading TIFF:', err);
-                        alert('Could not load TIFF image. It might be an unsupported compression format.');
-                    }
-                };
-                reader.readAsArrayBuffer(file);
-            } else {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvOrig = document.getElementById('canvas-orig');
-                        canvOrig.width = img.width;
-                        canvOrig.height = img.height;
-                        canvOrig.getContext('2d').drawImage(img, 0, 0);
-
-                        dropZone.style.display = 'none';
-                        document.getElementById('canvas-area').hidden = false;
-                        imageLoaded = true;
-                        syncChannelCanvasSizes();
-
-                        if (cvReady) processImage();
-                        else document.getElementById('result-note').textContent = 'Waiting for OpenCV.js to finish loading…';
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-
-        // ── View toggle ───────────────────────────────────────────────────
-        document.querySelectorAll('.view-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentView = btn.dataset.view;
-                if (cvReady && imageLoaded) processImage();
-            });
-        });
-
-        // ── Overlay toggle & opacity ──────────────────────────────────────
-        let overlayMode = false;
-
-        function toggleOverlay() {
-            overlayMode = !overlayMode;
-            const btn = document.getElementById('overlay-btn');
-            const row2 = document.getElementById('canvas-row2');
-            const opCtrl = document.getElementById('opacity-ctrl');
-            const container = document.getElementById('overlay-container');
-
-            btn.classList.toggle('active', overlayMode);
-            opCtrl.classList.toggle('visible', overlayMode);
-
-            if (overlayMode) {
-                // Make Row2 absolute on top of Row1
-                row2.classList.add('overlay-mode');
-                // Give the container a defined height equal to Row1
-                const row1 = document.getElementById('canvas-row1');
-                container.style.position = 'relative';
-                container.style.height = row1.offsetHeight + 'px';
-                updateOverlayOpacity();
-            } else {
-                row2.classList.remove('overlay-mode');
-                row2.style.opacity = '';
-                container.style.height = '';
-                container.style.position = '';
-            }
-        }
-
-        function updateOverlayOpacity() {
-            const val = document.getElementById('opacity-slider').value;
-            document.getElementById('opacity-val').textContent = val + '%';
-            if (overlayMode) {
-                document.getElementById('canvas-row2').style.opacity = val / 100;
-            }
-        }
-
-        // ── Sync channel canvas sizes to orig ─────────────────────────────
-        function syncChannelCanvasSizes() {
-            const orig = document.getElementById('canvas-orig');
-            ['canvas-ch-r', 'canvas-ch-g', 'canvas-ch-b',
-                'canvas-result', 'canvas-mask-r', 'canvas-mask-g', 'canvas-mask-b'].forEach(id => {
-                    const c = document.getElementById(id);
-                    c.width = orig.width;
-                    c.height = orig.height;
-                });
-        }
-
-        // ── Controls wiring ───────────────────────────────────────────────
-        // Grayscale threshold slider
-        document.getElementById('thresh').addEventListener('input', function () {
-            document.getElementById('thresh-val').textContent = this.value;
-            scheduleProcess();
-        });
-        document.getElementById('otsu').addEventListener('change', function () {
-            document.getElementById('thresh').disabled = this.checked;
-            scheduleProcess();
-        });
-        ['invert', 'negative', 'show-labels'].forEach(id =>
-            document.getElementById(id).addEventListener('change', scheduleProcess));
-
-        // Global (Original tab) sliders
-        ['orig-blur', 'orig-morph-open', 'orig-morph-close', 'orig-circ'].forEach(id => {
-            document.getElementById(id).addEventListener('input', function () {
-                const display = id === 'orig-circ' ? (this.value / 100).toFixed(2) : this.value;
-                document.getElementById(id + '-val').textContent = display;
-                scheduleProcess();
-            });
-        });
-        ['orig-min-area', 'orig-max-area'].forEach(id =>
-            document.getElementById(id).addEventListener('input', scheduleProcess));
-
-        function scheduleProcess() {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(processImage, 100);
-        }
-
-        // ── Channel tab switching ────────────────────────────────────
-        document.querySelectorAll('.ch-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.ch-tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.ch-panel').forEach(p => p.classList.remove('active'));
-                tab.classList.add('active');
-                document.getElementById('ch-panel-' + tab.dataset.ch).classList.add('active');
-            });
-        });
-
-        // ── Channel param wiring ────────────────────────────────────
-        ['r', 'g', 'b'].forEach(ch => {
-            document.getElementById(`ch-${ch}-thresh`).addEventListener('input', function () {
-                document.getElementById(`ch-${ch}-thresh-val`).textContent = this.value;
-                scheduleProcess();
-            });
-            document.getElementById(`ch-${ch}-circ`).addEventListener('input', function () {
-                document.getElementById(`ch-${ch}-circ-val`).textContent = (this.value / 100).toFixed(2);
-                scheduleProcess();
-            });
-            document.getElementById(`ch-${ch}-otsu`).addEventListener('change', function () {
-                document.getElementById(`ch-${ch}-thresh`).disabled = this.checked;
-                scheduleProcess();
-            });
-            // Enable / Invert toggles
-            document.getElementById(`ch-${ch}-enabled`).addEventListener('change', function () {
-                document.getElementById(`ch-${ch}-body`).classList.toggle('disabled', !this.checked);
-                scheduleProcess();
-            });
-            document.getElementById(`ch-${ch}-invert`).addEventListener('change', scheduleProcess);
-            // Override toggle: grey-out override-body when unchecked
-            document.getElementById(`ch-${ch}-override`).addEventListener('change', function () {
-                document.getElementById(`ch-${ch}-override-body`).classList.toggle('disabled', !this.checked);
-                scheduleProcess();
-            });
-            [`ch-${ch}-min-area`, `ch-${ch}-max-area`].forEach(id =>
-                document.getElementById(id).addEventListener('input', scheduleProcess));
-        });
-
-        // Helper: read per-channel params from UI (with Override fallback to Global tab)
-        function getChParam(ch) {
-            const override = document.getElementById(`ch-${ch}-override`).checked;
-            const gMinArea = parseFloat(document.getElementById('orig-min-area').value) || 1;
-            const gMaxArea = parseFloat(document.getElementById('orig-max-area').value) || Infinity;
-            const gMinCirc = parseInt(document.getElementById('orig-circ').value) / 100;
-            return {
-                enabled: document.getElementById(`ch-${ch}-enabled`).checked,
-                thresh: parseInt(document.getElementById(`ch-${ch}-thresh`).value),
-                useOtsu: document.getElementById(`ch-${ch}-otsu`).checked,
-                invert: document.getElementById(`ch-${ch}-invert`).checked,
-                minArea: override ? (parseFloat(document.getElementById(`ch-${ch}-min-area`).value) || 1) : gMinArea,
-                maxArea: override ? (parseFloat(document.getElementById(`ch-${ch}-max-area`).value) || Infinity) : gMaxArea,
-                minCirc: override ? (parseInt(document.getElementById(`ch-${ch}-circ`).value) / 100) : gMinCirc,
-            };
-        }
-
-        // ── Core processing ───────────────────────────────────────────────
-        function processImage() {
-            const canvOrig = document.getElementById('canvas-orig');
-            if (!cvReady || !imageLoaded || !canvOrig.width) return;
-
-            // Read parameters (grayscale pipeline)
-            const blurVal = parseInt(document.getElementById('orig-blur').value);
-            const threshVal = parseInt(document.getElementById('thresh').value);
-            const useOtsu = document.getElementById('otsu').checked;
-            const invert = document.getElementById('invert').checked;
-            const isNegative = document.getElementById('negative').checked;
-            const openIter = parseInt(document.getElementById('orig-morph-open').value);
-            const closeIter = parseInt(document.getElementById('orig-morph-close').value);
-            const minArea = parseFloat(document.getElementById('orig-min-area').value) || 1;
-            const maxArea = parseFloat(document.getElementById('orig-max-area').value) || Infinity;
-            const minCirc = parseInt(document.getElementById('orig-circ').value) / 100;
-            const showLabels = document.getElementById('show-labels').checked;
-
-            // Allocate OpenCV Mats
-            let src = null, gray = null, blurred = null, binary = null;
-            let contours = null, hierarchy = null, displayMat = null, kernel = null;
-            let chR = null, chG = null, chB = null, chA = null, chVec = null;
-            let chRdisp = null, chGdisp = null, chBdisp = null;
-            let maskR = null, maskG = null, maskB = null;
-            let maskRdisp = null, maskGdisp = null, maskBdisp = null;
-
-            try {
-                src = cv.imread(canvOrig);
-
-                if (isNegative) {
-                    let temp = new cv.Mat();
-                    cv.cvtColor(src, temp, cv.COLOR_RGBA2RGB);
-                    cv.bitwise_not(temp, temp);
-                    cv.cvtColor(temp, src, cv.COLOR_RGB2RGBA);
-                    temp.delete();
-                }
-
-                // ── Channel split (RGBA → R, G, B, A) ────────────────────
-                chVec = new cv.MatVector();
-                cv.split(src, chVec);
-                chR = chVec.get(0);  // Red
-                chG = chVec.get(1);  // Green
-                chB = chVec.get(2);  // Blue
-                chA = chVec.get(3);  // Alpha (not used)
-
-                // Display channel images with colour tint
-                // Helper: single-channel gray → RGBA with tint (r,g,b)
-                function channelToRGBA(ch, r, g, b) {
-                    const rgba = new cv.Mat();
-                    const zeros = cv.Mat.zeros(ch.rows, ch.cols, cv.CV_8UC1);
-                    const channels = new cv.MatVector();
-                    channels.push_back(r ? ch : zeros);
-                    channels.push_back(g ? ch : zeros);
-                    channels.push_back(b ? ch : zeros);
-                    const alpha = new cv.Mat(ch.rows, ch.cols, cv.CV_8UC1, new cv.Scalar(255));
-                    channels.push_back(alpha);
-                    cv.merge(channels, rgba);
-                    zeros.delete(); alpha.delete(); channels.delete();
-                    return rgba;
-                }
-
-                chRdisp = channelToRGBA(chR, true, false, false);
-                chGdisp = channelToRGBA(chG, false, true, false);
-                chBdisp = channelToRGBA(chB, false, false, true);
-
-                cv.imshow('canvas-ch-r', chRdisp);
-                cv.imshow('canvas-ch-g', chGdisp);
-                cv.imshow('canvas-ch-b', chBdisp);
-
-                // ── Per-channel threshold masks ───────────────────────────
-                const ksize = blurVal % 2 === 0 ? blurVal + 1 : blurVal;
-
-                function buildChannelMask(ch, color, p) {
-                    if (!p.enabled) return cv.Mat.zeros(ch.rows, ch.cols, cv.CV_8UC4);
-                    const blr = new cv.Mat();
-                    const bin = new cv.Mat();
-                    cv.GaussianBlur(ch, blr, new cv.Size(ksize, ksize), 0);
-                    let ttype = p.invert ? cv.THRESH_BINARY_INV : cv.THRESH_BINARY;
-                    if (p.useOtsu) ttype |= cv.THRESH_OTSU;
-                    cv.threshold(blr, bin, p.useOtsu ? 0 : p.thresh, 255, ttype);
-                    blr.delete();
-                    const rgba = channelToRGBA(bin, color[0], color[1], color[2]);
-                    bin.delete();
-                    return rgba;
-                }
-
-                const pR = getChParam('r'), pG = getChParam('g'), pB = getChParam('b');
-                maskRdisp = buildChannelMask(chR, [true, false, false], pR);
-                maskGdisp = buildChannelMask(chG, [false, true, false], pG);
-                maskBdisp = buildChannelMask(chB, [false, false, true], pB);
-
-                cv.imshow('canvas-mask-r', maskRdisp);
-                cv.imshow('canvas-mask-g', maskGdisp);
-                cv.imshow('canvas-mask-b', maskBdisp);
-
-                // ── Main detection pipeline (grayscale) ───────────────────
-                gray = new cv.Mat();
-                blurred = new cv.Mat();
-                binary = new cv.Mat();
-
-                // 1. Grayscale
-                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-
-                // 2. Gaussian blur (kernel must be odd)
-                cv.GaussianBlur(gray, blurred, new cv.Size(ksize, ksize), 0);
-
-                // 3. Threshold
-                let threshType = invert ? cv.THRESH_BINARY_INV : cv.THRESH_BINARY;
-                if (useOtsu) threshType |= cv.THRESH_OTSU;
-                const computedThresh = cv.threshold(blurred, binary, useOtsu ? 0 : threshVal, 255, threshType);
-
-                // Update slider to show computed Otsu value
-                if (useOtsu) {
-                    document.getElementById('thresh').value = Math.round(computedThresh);
-                    document.getElementById('thresh-val').textContent = Math.round(computedThresh);
-                }
-
-                // 4. Morphological open  5. Morphological close
-                kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(3, 3));
-                if (openIter > 0)
-                    cv.morphologyEx(binary, binary, cv.MORPH_OPEN, kernel, new cv.Point(-1, -1), openIter);
-                if (closeIter > 0)
-                    cv.morphologyEx(binary, binary, cv.MORPH_CLOSE, kernel, new cv.Point(-1, -1), closeIter);
-
-                // 6. Find contours
-                contours = new cv.MatVector();
-                hierarchy = new cv.Mat();
-                cv.findContours(binary, contours, hierarchy,
-                    cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-                // 7. Filter by area and circularity
-                const validCells = [];
-                for (let i = 0; i < contours.size(); i++) {
-                    const c = contours.get(i);
-                    const area = cv.contourArea(c);
-                    if (area < minArea || area > maxArea) continue;
-                    const perimeter = cv.arcLength(c, true);
-                    const circ = perimeter > 0 ? (4 * Math.PI * area) / (perimeter * perimeter) : 0;
-                    if (circ < minCirc) continue;
-                    const m = cv.moments(c);
-                    if (m.m00 === 0) continue;
-                    validCells.push({
-                        index: i,
-                        cx: Math.round(m.m10 / m.m00),
-                        cy: Math.round(m.m01 / m.m00),
-                        radius: Math.max(4, Math.round(Math.sqrt(area / Math.PI)))
-                    });
-                }
-
-                // 8. Build result canvas
-                if (currentView === 'thresh') {
-                    displayMat = new cv.Mat();
-                    cv.cvtColor(binary, displayMat, cv.COLOR_GRAY2RGBA);
-                    validCells.forEach(cell =>
-                        cv.drawContours(displayMat, contours, cell.index,
-                            new cv.Scalar(255, 60, 60, 255), 2));
-                } else {
-                    displayMat = src.clone();
-                    validCells.forEach(cell => {
-                        cv.circle(displayMat, new cv.Point(cell.cx, cell.cy),
-                            cell.radius, new cv.Scalar(0, 220, 80, 255), 2);
-                        cv.circle(displayMat, new cv.Point(cell.cx, cell.cy),
-                            3, new cv.Scalar(255, 50, 50, 255), -1);
-                    });
-                }
-
-                if (showLabels) {
-                    validCells.forEach((cell, n) =>
-                        cv.putText(displayMat, String(n + 1),
-                            new cv.Point(cell.cx + cell.radius + 3, cell.cy - cell.radius - 3),
-                            cv.FONT_HERSHEY_SIMPLEX, 0.45,
-                            new cv.Scalar(255, 255, 0, 255), 1));
-                }
-
-                cv.imshow('canvas-result', displayMat);
-
-                // Re-apply overlay height after repaint
-                if (overlayMode) {
-                    const row1 = document.getElementById('canvas-row1');
-                    document.getElementById('overlay-container').style.height = row1.offsetHeight + 'px';
-                }
-
-                document.getElementById('result-count').textContent = validCells.length;
-                document.getElementById('result-note').textContent =
-                    `${contours.size()} total contours; ${contours.size() - validCells.length} filtered out`;
-
-            } catch (err) {
-                console.error('Processing error:', err);
-                document.getElementById('result-note').textContent = 'Error: ' + err.message;
-            } finally {
-                if (src) src.delete();
-                if (gray) gray.delete();
-                if (blurred) blurred.delete();
-                if (binary) binary.delete();
-                if (kernel) kernel.delete();
-                if (contours) contours.delete();
-                if (hierarchy) hierarchy.delete();
-                if (displayMat) displayMat.delete();
-                if (chR) chR.delete();
-                if (chG) chG.delete();
-                if (chB) chB.delete();
-                if (chA) chA.delete();
-                if (chVec) chVec.delete();
-                if (chRdisp) chRdisp.delete();
-                if (chGdisp) chGdisp.delete();
-                if (chBdisp) chBdisp.delete();
-                if (maskRdisp) maskRdisp.delete();
-                if (maskGdisp) maskGdisp.delete();
-                if (maskBdisp) maskBdisp.delete();
-            }
-        }
-    </script>
+    <!-- Cell Counter logic (synchronous: ensures onOpenCvReady is global before onload fires) -->
+    <script src="src/cell_counter.js"></script>
     <script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
         data-id="kemuchem" data-description="Support me on Buy me a coffee!" data-message="" data-color="#FF5F5F"
         data-position="Right" data-x_margin="18" data-y_margin="18"></script>
