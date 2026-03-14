@@ -94,6 +94,53 @@ function loadImage(file) {
                 canvOrig.getContext('2d').putImageData(
                     new ImageData(new Uint8ClampedArray(rgba), ifds[0].width, ifds[0].height), 0, 0);
 
+                // --- Extract scale from TIFF metadata ---
+                try {
+                    let umPerPx = null;
+                    const ifd = ifds[0];
+                    
+                    if (ifd.t270) {
+                        const desc = (typeof ifd.t270 === 'string') ? ifd.t270 : Array.from(ifd.t270).map(c => String.fromCharCode(c)).join('');
+                        const mUnit = desc.match(/unit=([^\r\n]+)/);
+                        const mPixelWidth = desc.match(/pixel_width=([0-9\.]+)/);
+                        if (mUnit && mPixelWidth) {
+                            const unit = mUnit[1].toLowerCase();
+                            const val = parseFloat(mPixelWidth[1]);
+                            if (unit === 'um' || unit === 'micron' || unit === 'microns') umPerPx = val;
+                            else if (unit === 'nm') umPerPx = val / 1000;
+                            else if (unit === 'mm') umPerPx = val * 1000;
+                            else if (unit === 'cm') umPerPx = val * 10000;
+                            else if (unit === 'inch') umPerPx = val * 25400;
+                        }
+                    }
+                    
+                    if (umPerPx === null && ifd.t282 && ifd.t282.length >= 2 && ifd.t296) {
+                        const num = ifd.t282[0], den = ifd.t282[1];
+                        if (num > 0) {
+                            const pxlPerUnit = num / den;
+                            const unit = Array.isArray(ifd.t296) ? ifd.t296[0] : ifd.t296;
+                            if (unit === 3) umPerPx = 10000 / pxlPerUnit;
+                            else if (unit === 2) umPerPx = 25400 / pxlPerUnit;
+                        }
+                    }
+                    
+                    if (umPerPx !== null && umPerPx > 0 && Number.isFinite(umPerPx)) {
+                        document.getElementById('scale-um-per-px').value = umPerPx.toFixed(4);
+                        const statusEl = document.getElementById('scale-meta-status');
+                        statusEl.textContent = '✓ Metadata found';
+                        statusEl.style.color = '#15803d';
+                        statusEl.style.background = '#dcfce3';
+                        statusEl.title = `Scale: ${umPerPx.toFixed(4)} µm/px`;
+                    } else {
+                        const statusEl = document.getElementById('scale-meta-status');
+                        statusEl.textContent = 'No scale metadata';
+                        statusEl.style.color = '#94a3b8';
+                        statusEl.style.background = '#f1f5f9';
+                        statusEl.title = '';
+                    }
+                } catch (metaErr) { console.warn('Scale metadata parse error:', metaErr); }
+                // -----------------------------------------
+
                 _afterImageLoad(file.name);
             } catch (err) {
                 console.error('Error loading TIFF:', err);
@@ -110,6 +157,13 @@ function loadImage(file) {
                 canvOrig.width = img.width;
                 canvOrig.height = img.height;
                 canvOrig.getContext('2d').drawImage(img, 0, 0);
+
+                const statusEl = document.getElementById('scale-meta-status');
+                statusEl.textContent = 'No metadata (Not a TIFF)';
+                statusEl.style.color = '#94a3b8';
+                statusEl.style.background = '#f1f5f9';
+                statusEl.title = '';
+
                 _afterImageLoad(file.name);
             };
             img.src = e.target.result;
@@ -187,6 +241,18 @@ document.getElementById('load-btn').addEventListener('click', () =>
 // Overlay toggle & opacity slider
 document.getElementById('overlay-btn').addEventListener('click', toggleOverlay);
 document.getElementById('opacity-slider').addEventListener('input', updateOverlayOpacity);
+
+// Scale bar events
+document.getElementById('show-scale-bar').addEventListener('change', () => {
+    _condRules.forEach(r => _rerenderCondCanvas(r.id));
+});
+document.getElementById('scale-um-per-px').addEventListener('input', () => {
+    _condRules.forEach(r => _rerenderCondCanvas(r.id));
+});
+document.getElementById('scale-bar-length').addEventListener('input', function() {
+    document.getElementById('scale-bar-length-val').textContent = this.value;
+    _condRules.forEach(r => _rerenderCondCanvas(r.id));
+});
 
 // Add condition button
 document.getElementById('cond-add-btn').addEventListener('click', addCondRule);
@@ -570,6 +636,41 @@ function _rerenderCondCanvas(ruleId) {
             displayMat.delete();
             displayMat = blended;
         }
+
+        // --- Draw scale bar (Bottom Left) ---
+        if (document.getElementById('show-scale-bar').checked) {
+            const umPerPx = parseFloat(document.getElementById('scale-um-per-px').value);
+            const scaleUm = parseInt(document.getElementById('scale-bar-length').value);
+            if (umPerPx > 0 && scaleUm > 0) {
+                const scalePx = Math.round(scaleUm / umPerPx);
+                if (scalePx > 0 && scalePx < displayMat.cols) {
+                    const barHeight = Math.max(4, Math.round(displayMat.rows * 0.015));
+                    const padding = 15;
+                    const pt1 = new cv.Point(padding, displayMat.rows - padding - barHeight);
+                    const pt2 = new cv.Point(padding + scalePx, displayMat.rows - padding);
+                    
+                    // Black outline slightly larger
+                    cv.rectangle(displayMat, new cv.Point(pt1.x - 2, pt1.y - 2), new cv.Point(pt2.x + 2, pt2.y + 2), new cv.Scalar(0, 0, 0, 255), -1);
+                    // White fill
+                    cv.rectangle(displayMat, pt1, pt2, new cv.Scalar(255, 255, 255, 255), -1);
+                    
+                    // Text above bar
+                    const textStr = scaleUm + " um";
+                    const fontScale = Math.max(0.4, barHeight / 20.0);
+                    const thickness = Math.max(1, Math.round(fontScale * 1.5));
+                    
+                    // Rough manual text offset
+                    const textY = pt1.y - Math.max(4, Math.round(displayMat.rows * 0.01));
+                    
+                    // Black outline text
+                    cv.putText(displayMat, textStr, new cv.Point(padding, textY), cv.FONT_HERSHEY_SIMPLEX, fontScale, new cv.Scalar(0, 0, 0, 255), thickness + 2);
+                    // White inline text
+                    cv.putText(displayMat, textStr, new cv.Point(padding, textY), cv.FONT_HERSHEY_SIMPLEX, fontScale, new cv.Scalar(255, 255, 255, 255), thickness);
+                }
+            }
+        }
+        // ------------------------------------
+
         cv.imshow(canvasId, displayMat);
     } finally {
         if (displayMat) displayMat.delete();
