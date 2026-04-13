@@ -10,24 +10,27 @@
     <link rel="stylesheet" href="main_style.css">
     <style>
         .portal-container {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-rows: auto auto;
+            grid-auto-flow: column;
+            grid-auto-columns: 280px;
             gap: 20px;
             justify-content: center;
             margin-top: 40px;
+            padding: 0 20px;
         }
 
         .tool-card {
             background: white;
             border-radius: 12px;
             padding: 30px;
-            width: 300px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             text-align: center;
             transition: transform 0.2s, box-shadow 0.2s;
-            cursor: pointer;
+            cursor: grab;
             text-decoration: none;
             color: inherit;
+            user-select: none;
         }
 
         .tool-card:hover {
@@ -35,10 +38,21 @@
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
 
+        .tool-card.dragging {
+            opacity: 0.4;
+            transform: scale(0.95);
+        }
+
+        .tool-card.drag-over {
+            border: 2px dashed var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+
         .tool-icon {
             font-size: 48px;
             margin-bottom: 20px;
             display: block;
+            pointer-events: none;
         }
 
         .tool-title {
@@ -46,12 +60,14 @@
             margin-bottom: 10px;
             font-weight: bold;
             color: #333;
+            pointer-events: none;
         }
 
         .tool-desc {
             color: #666;
             font-size: 0.9em;
             line-height: 1.5;
+            pointer-events: none;
         }
 
         header {
@@ -69,6 +85,16 @@
             font-size: 1.1em;
             color: #777;
         }
+
+        /* Responsive: stack single column on narrow screens */
+        @media (max-width: 640px) {
+            .portal-container {
+                grid-template-rows: unset;
+                grid-auto-flow: row;
+                grid-auto-columns: unset;
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 
@@ -79,44 +105,101 @@
         <div class="subtitle">Select a tool to get started</div>
     </header>
 
-    <div class="portal-container">
-        <a href="bib2ref.html" class="tool-card">
-            <span class="tool-icon">📚</span>
-            <div class="tool-title">RefConverter</div>
-            <div class="tool-desc">
-                Simple & Fast Reference Generator - Convert BibTeX, RIS, and DOI to formatted references. Supports multiple citation styles.
-            </div>
-        </a>
-
-        <a href="SimpleTLCAnalysis.html" class="tool-card">
-            <span class="tool-icon">🧪</span>
-            <div class="tool-title">TLC Analysis</div>
-            <div class="tool-desc">Analyze TLC plates - Rf values, intensity profiles, and contrast enhancement for spot detection.</div>
-        </a>
-
-        <a href="cell_counter.html" class="tool-card">
-            <span class="tool-icon">🔬</span>
-            <div class="tool-title">Cell Counter</div>
-            <div class="tool-desc">Automatic cell counting from microscopy images using OpenCV.js — threshold, morphology, and blob filtering.</div>
-        </a>
-
-        <a href="NMRImpurityFinder.html" class="tool-card">
-            <span class="tool-icon">📊</span>
-            <div class="tool-title">NMR Impurity Finder</div>
-            <div class="tool-desc">Visual NMR impurity peak identifier — select deuterated solvents and instantly see common impurity shifts on an interactive spectrum.</div>
-        </a>
-
-        <a href="ChromatographAnalysis.html" class="tool-card">
-            <span class="tool-icon">⚗️</span>
-            <div class="tool-title">Chromatograph Analysis</div>
-            <div class="tool-desc">Column chromatography condition designer — predict elution from TLC Rf values, visualize separation, and plan step gradients.</div>
-        </a>
-    </div>
+    <div class="portal-container" id="portal"></div>
 
     <footer style="text-align: center; margin-top: 60px; color: #888; font-size: 0.8em; padding-bottom: 20px;">
         &copy; 2026 Tools Handbook
     </footer>
 
+    <script>
+    (() => {
+        const STORAGE_KEY = "tools_handbook_order";
+
+        const TOOLS = [
+            { id: "bib2ref",       href: "bib2ref.html",               icon: "📚", title: "RefConverter",          desc: "Simple & Fast Reference Generator - Convert BibTeX, RIS, and DOI to formatted references. Supports multiple citation styles." },
+            { id: "tlc",           href: "SimpleTLCAnalysis.html",      icon: "🧪", title: "TLC Analysis",          desc: "Analyze TLC plates - Rf values, intensity profiles, and contrast enhancement for spot detection." },
+            { id: "cell_counter",  href: "cell_counter.html",           icon: "🔬", title: "Cell Counter",          desc: "Automatic cell counting from microscopy images using OpenCV.js — threshold, morphology, and blob filtering." },
+            { id: "nmr",           href: "NMRImpurityFinder.html",      icon: "📊", title: "NMR Impurity Finder",   desc: "Visual NMR impurity peak identifier — select deuterated solvents and instantly see common impurity shifts on an interactive spectrum." },
+            { id: "chromato",      href: "ChromatographAnalysis.html",   icon: "⚗️", title: "Chromatograph Analysis", desc: "Column chromatography condition designer — predict elution from TLC Rf values, visualize separation, and plan step gradients." },
+        ];
+
+        function getOrder() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+                if (Array.isArray(saved) && saved.length === TOOLS.length) {
+                    // Validate all ids present
+                    const ids = new Set(TOOLS.map(t => t.id));
+                    if (saved.every(id => ids.has(id))) return saved;
+                }
+            } catch {}
+            return TOOLS.map(t => t.id);
+        }
+
+        function saveOrder(order) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(order));
+        }
+
+        const portal = document.getElementById("portal");
+        let order = getOrder();
+        let dragSrcId = null;
+
+        function renderCards() {
+            portal.innerHTML = "";
+            order.forEach(id => {
+                const tool = TOOLS.find(t => t.id === id);
+                if (!tool) return;
+                const a = document.createElement("a");
+                a.href = tool.href;
+                a.className = "tool-card";
+                a.draggable = true;
+                a.dataset.id = tool.id;
+                a.innerHTML = `<span class="tool-icon">${tool.icon}</span>` +
+                    `<div class="tool-title">${tool.title}</div>` +
+                    `<div class="tool-desc">${tool.desc}</div>`;
+
+                // Drag events
+                a.addEventListener("dragstart", e => {
+                    dragSrcId = tool.id;
+                    a.classList.add("dragging");
+                    e.dataTransfer.effectAllowed = "move";
+                });
+                a.addEventListener("dragend", () => {
+                    a.classList.remove("dragging");
+                    portal.querySelectorAll(".drag-over").forEach(el => el.classList.remove("drag-over"));
+                    dragSrcId = null;
+                });
+                a.addEventListener("dragover", e => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (tool.id !== dragSrcId) a.classList.add("drag-over");
+                });
+                a.addEventListener("dragleave", () => {
+                    a.classList.remove("drag-over");
+                });
+                a.addEventListener("drop", e => {
+                    e.preventDefault();
+                    a.classList.remove("drag-over");
+                    if (!dragSrcId || dragSrcId === tool.id) return;
+                    const fromIdx = order.indexOf(dragSrcId);
+                    const toIdx = order.indexOf(tool.id);
+                    order.splice(fromIdx, 1);
+                    order.splice(toIdx, 0, dragSrcId);
+                    saveOrder(order);
+                    renderCards();
+                });
+
+                // Prevent navigation on drag
+                a.addEventListener("click", e => {
+                    if (a.classList.contains("dragging")) e.preventDefault();
+                });
+
+                portal.appendChild(a);
+            });
+        }
+
+        renderCards();
+    })();
+    </script>
 </body>
 
 </html>
