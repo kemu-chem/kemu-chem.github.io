@@ -59,6 +59,10 @@
                 <input type="checkbox" id="abbrev_journal_check">
                 <span>Abbrev. Journal</span>
             </label>
+            <label style="display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" id="show_doi_check">
+                <span>Show DOI</span>
+            </label>
             <!--<button id="convert_btn" py-click="on_convert" disabled>Generate</button>-->
             <!--<button id="debug_btn" py-click="show_debug_info">Debug Info</button>
             <button id="reload_modules_btn" py-click="reload_modules">Force Reload Modules</button>-->
@@ -241,6 +245,7 @@
             omit_title = document.querySelector("#omit_title_check").checked
             reverse_authors = document.querySelector("#reverse_authors_check").checked
             use_abbr = document.querySelector("#abbrev_journal_check").checked
+            show_doi = document.querySelector("#show_doi_check").checked
 
             output_div = document.querySelector("#output")
             output_div.innerHTML = "Processing..."
@@ -337,6 +342,8 @@
                     if use_abbr and 'journal' in display_entry:
                         key = display_entry['journal'].lower().strip()
                         display_entry['journal'] = JOURNAL_ABBR.get(key, display_entry['journal'])
+                    if not show_doi:
+                        display_entry['doi'] = ''
                     _, rtf = formatter(display_entry, i, max_n=max_n, omit_title=omit_title, reverse_authors=False)
                     html_output += f'<div class="citation-item">{rtf_to_html(rtf)}</div>'
 
@@ -398,6 +405,7 @@
                 const omitTitleCheck = document.getElementById('omit_title_check');
                 const reverseAuthorsCheck = document.getElementById('reverse_authors_check');
                 const abbrevJournalCheck = document.getElementById('abbrev_journal_check');
+                const showDoiCheck = document.getElementById('show_doi_check');
 
                 // Auto-convert on textarea input (with debounce)
                 let inputTimeout;
@@ -416,6 +424,7 @@
                 omitTitleCheck.addEventListener('change', triggerConvert);
                 reverseAuthorsCheck.addEventListener('change', triggerConvert);
                 abbrevJournalCheck.addEventListener('change', triggerConvert);
+                showDoiCheck.addEventListener('change', triggerConvert);
             };
 
             // Wait for PyScript to initialize
