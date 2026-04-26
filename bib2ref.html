@@ -55,6 +55,10 @@
                 <input type="checkbox" id="reverse_authors_check">
                 <span>Reverse 1st & Last</span>
             </label>
+            <label style="display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" id="abbrev_journal_check">
+                <span>Abbrev. Journal</span>
+            </label>
             <!--<button id="convert_btn" py-click="on_convert" disabled>Generate</button>-->
             <!--<button id="debug_btn" py-click="show_debug_info">Debug Info</button>
             <button id="reload_modules_btn" py-click="reload_modules">Force Reload Modules</button>-->
@@ -87,7 +91,7 @@
     <py-config>
         packages = ["bibtexparser", "rispy"]
         [[fetch]]
-        files = ["src/bibcite_core.py","src/riscite_core.py", "src/doicite_core.py"]
+        files = ["src/bibcite_core.py","src/riscite_core.py", "src/doicite_core.py", "src/journal_abbr.json"]
     </py-config>
 
     <script type="py">
@@ -106,10 +110,18 @@
         import re
         import asyncio
         from pyscript import document
+
+        # Journal abbreviation lookup (lowercase key -> abbreviation)
+        JOURNAL_ABBR = {}
+
         # Wait until external files are loaded
         try:
             from src.riscite_core import RISProcessor, REFERENCE_STYLES, BibTeXProcessor, rtf_to_html
             from src.doicite_core import DOIProcessor
+            import json
+            with open('src/journal_abbr.json') as _f:
+                _abbr_raw = json.load(_f)
+            JOURNAL_ABBR = {k.lower(): v for k, v in _abbr_raw.items() if not k.startswith('_')}
             document.querySelector("#status-msg").style.display = "none"
             # Enable convert button if it exists
             convert_btn = document.querySelector("#convert_btn")
@@ -228,6 +240,7 @@
             max_n = int(max_n_str) if max_n_str else None
             omit_title = document.querySelector("#omit_title_check").checked
             reverse_authors = document.querySelector("#reverse_authors_check").checked
+            use_abbr = document.querySelector("#abbrev_journal_check").checked
 
             output_div = document.querySelector("#output")
             output_div.innerHTML = "Processing..."
@@ -320,7 +333,11 @@
                     entries.sort(key=lambda x: int(re.search(r'\d{4}', x.get("year", "0")).group()) if re.search(r'\d{4}', x.get("year", "")) else 0)
 
                 for i, entry in enumerate(entries, 1):
-                    _, rtf = formatter(entry, i, max_n=max_n, omit_title=omit_title, reverse_authors=False)
+                    display_entry = dict(entry)
+                    if use_abbr and 'journal' in display_entry:
+                        key = display_entry['journal'].lower().strip()
+                        display_entry['journal'] = JOURNAL_ABBR.get(key, display_entry['journal'])
+                    _, rtf = formatter(display_entry, i, max_n=max_n, omit_title=omit_title, reverse_authors=False)
                     html_output += f'<div class="citation-item">{rtf_to_html(rtf)}</div>'
 
                 output_div.innerHTML = html_output
@@ -380,6 +397,7 @@
                 const maxNInput = document.getElementById('max_n_input');
                 const omitTitleCheck = document.getElementById('omit_title_check');
                 const reverseAuthorsCheck = document.getElementById('reverse_authors_check');
+                const abbrevJournalCheck = document.getElementById('abbrev_journal_check');
 
                 // Auto-convert on textarea input (with debounce)
                 let inputTimeout;
@@ -397,6 +415,7 @@
                 });
                 omitTitleCheck.addEventListener('change', triggerConvert);
                 reverseAuthorsCheck.addEventListener('change', triggerConvert);
+                abbrevJournalCheck.addEventListener('change', triggerConvert);
             };
 
             // Wait for PyScript to initialize
