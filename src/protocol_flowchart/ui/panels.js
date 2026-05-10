@@ -5,24 +5,26 @@ const panelEl = document.getElementById('panel-container');
 // tStep: actual slider step value computed in editor (snapMode ? snapStep : 0.01)
 export function renderPanel(selection, updateFn, tStep = 0.25) {
   if (!selection?.data) {
-    panelEl.innerHTML = '<p class="panel-empty">ノードまたはエッジを選択してください</p>';
+    panelEl.innerHTML = '<p class="panel-empty">Please select a node or edge</p>';
     return;
   }
-  if (selection.type === 'node')  renderNodePanel(selection.data, updateFn);
-  else if (selection.type === 'multi') renderMultiPanel(selection.data, updateFn);
-  else renderEdgePanel(selection.data, updateFn, tStep);
+  if      (selection.type === 'node')       renderNodePanel(selection.data, updateFn);
+  else if (selection.type === 'multi')      renderMultiPanel(selection.data, updateFn);
+  else if (selection.type === 'multi-edge') renderMultiEdgePanel(selection.data, updateFn);
+  else if (selection.type === 'annot')      renderAnnotPanel(selection.data, updateFn, tStep);
+  else                                      renderEdgePanel(selection.data, updateFn, tStep);
 }
 
 // ── Node panel ────────────────────────────────────────────────────────────────
 
 function renderNodePanel(node, updateFn) {
   panelEl.innerHTML = `
-    <h3 style="${H3}">ノード プロパティ</h3>
-    ${field('ラベル',         textarea('label', node.label))}
-    ${field('形状',           selectEl('shape', node.shape, [['none','なし'],['box','矩形'],['circle','円'],['diamond','ひし形']]))}
-    ${field('枠色',           colorEl('borderColor', node.style.borderColor))}
-    ${field('塗り色',         colorEl('fillColor',   node.style.fillColor))}
-    ${field('フォントサイズ', numberEl('fontSize', node.style.fontSize, 8, 36))}
+    <h3 style="${H3}">Node Properties</h3>
+    ${field('Label',         textarea('label', node.label))}
+    ${field('Shape',           selectEl('shape', node.shape, [['none','None'],['box','Box'],['circle','Circle'],['diamond','Diamond']]))}
+    ${field('Border Color',           colorEl('borderColor', node.style.borderColor))}
+    ${field('Fill Color',         colorEl('fillColor',   node.style.fillColor))}
+    ${field('Font Size', numberEl('fontSize', node.style.fontSize, 8, 36))}
   `;
   bind('textarea[name="label"]',      'input',  v => updateFn(node.id, { label: v }));
   bind('select[name="shape"]',        'change', v => updateFn(node.id, { shape: v }));
@@ -35,15 +37,65 @@ function renderNodePanel(node, updateFn) {
 
 function renderMultiPanel(nodes, updateFn) {
   panelEl.innerHTML = `
-    <h3 style="${H3}">${nodes.length} ノードを選択中</h3>
-    ${field('形状',   selectEl('shape', '', [['','（変更なし）'],['none','なし'],['box','矩形'],['circle','円'],['diamond','ひし形']]))}
-    ${field('枠色',   colorEl('borderColor', '#333333'))}
-    ${field('塗り色', colorEl('fillColor',   '#ffffff'))}
+    <h3 style="${H3}">${nodes.length} Nodes Selected</h3>
+    ${field('Shape',   selectEl('shape', '', [['','(No change)'],['none','None'],['box','Box'],['circle','Circle'],['diamond','Diamond']]))}
+    ${field('Border Color',   colorEl('borderColor', '#333333'))}
+    ${field('Fill Color', colorEl('fillColor',   '#ffffff'))}
   `;
   const ids = nodes.map(n => n.id);
   bind('select[name="shape"]',      'change', v => { if (v) updateFn(ids, { shape: v }); });
   bind('input[name="borderColor"]', 'input',  v => updateFn(ids, { style: { borderColor: v } }));
   bind('input[name="fillColor"]',   'input',  v => updateFn(ids, { style: { fillColor: v } }));
+}
+
+// ── Multi-edge panel ─────────────────────────────────────────────────────────
+
+function renderMultiEdgePanel(edges, updateFn) {
+  const ids = edges.map(e => e.id);
+  panelEl.innerHTML = `
+    <h3 style="${H3}">${edges.length} Edges Selected</h3>
+    ${field('Routing', radioGroup('routing',  '', [['orthogonal','Orthogonal'],['diagonal','Diagonal']]))}
+    ${field('Line Type',         radioGroup('lineType', '', [['normal','Solid'],['dashed','Dashed']]))}
+    ${field('Thickness',         numberEl('thickness', '', 1, 6))}
+    ${field('Head Size', numberEl('headSize',  '', 4, 20))}
+  `;
+  bindRadio('routing',  v => updateFn(ids, { routing: v }));
+  bindRadio('lineType', v => updateFn(ids, { arrowStyle: { type: v } }));
+  bind('input[name="thickness"]', 'input', v => { if (v) updateFn(ids, { arrowStyle: { thickness: Number(v) } }); });
+  bind('input[name="headSize"]',  'input', v => { if (v) updateFn(ids, { arrowStyle: { headSize:  Number(v) } }); });
+}
+
+// ── Annotation panel ──────────────────────────────────────────────────────────
+
+function renderAnnotPanel(item, updateFn, tStep) {
+  const itemStep = (item.snap ?? true) ? tStep : 0.01;
+  panelEl.innerHTML = `
+    <h3 style="${H3}">Annotation Properties</h3>
+    ${field('Label',     textarea('a-label', item.label, 3))}
+    ${field('Side',       radioGroup('a-side', item.side, [['above','Above (Left)'],['below','Below (Right)']]))}
+    ${field('Position t',     rangeEl('a-t', item.t, itemStep))}
+    ${field('Snap t', checkboxEl('a-snap', item.snap ?? true))}
+    ${field('Shape',       selectEl('a-shape', item.shape, [['none','None'],['box','Box']]))}
+    ${field('Distance',       numberEl('a-dist', item.dist ?? 40, 10, 200))}
+    ${field('Show Arrow',   checkboxEl('a-arrow', item.showArrow ?? true))}
+    ${field('Arrow Gap', numberEl('a-gap', item.arrowGap ?? 2, 0, 40))}
+  `;
+  const labelEl = panelEl.querySelector('textarea[name="a-label"]');
+  if (labelEl) labelEl.addEventListener('input', () => updateFn(item.id, { label: labelEl.value }));
+  bindRadio('a-side', v => updateFn(item.id, { side: v }));
+  const tEl = panelEl.querySelector('input[name="a-t"]');
+  if (tEl) {
+    const tSpan = tEl.nextElementSibling;
+    tEl.addEventListener('input', () => {
+      if (tSpan) tSpan.textContent = Number(tEl.value).toFixed(2);
+      updateFn(item.id, { t: Number(tEl.value) });
+    });
+  }
+  bind('input[name="a-snap"]',  'change', v => updateFn(item.id, { snap:      v === 'true' }), true);
+  bind('select[name="a-shape"]','change', v => updateFn(item.id, { shape:     v }));
+  bind('input[name="a-dist"]',  'input',  v => updateFn(item.id, { dist:      Number(v) }));
+  bind('input[name="a-arrow"]', 'change', v => updateFn(item.id, { showArrow: v === 'true' }), true);
+  bind('input[name="a-gap"]',   'input',  v => updateFn(item.id, { arrowGap:  Number(v) }));
 }
 
 // ── Edge panel ────────────────────────────────────────────────────────────────
@@ -52,26 +104,26 @@ function renderEdgePanel(edge, updateFn, tStep) {
   const items = edge.annotations.items ?? [];
 
   panelEl.innerHTML = `
-    <h3 style="${H3}">エッジ プロパティ</h3>
+    <h3 style="${H3}">Edge Properties</h3>
 
-    ${field('巻矢印（還流/撹拌）', checkboxEl('coil', edge.annotations.coil))}
+    ${field('Coil Arrow (Reflux/Stir)', checkboxEl('coil', edge.annotations.coil))}
     ${edge.annotations.coil ? `
-      ${field('位置 t',       rangeEl('coilT', edge.annotations.coilT ?? 0.5, tStep))}
-      ${field('方向',         radioGroup('coilSide', edge.annotations.coilSide ?? 'above', [['above','上（法線左）'],['below','下（法線右）']]))}
-      ${field('線の太さ',     numberEl('coilThickness', edge.annotations.coilStyle?.thickness ?? 1.5, 0.5, 6, 0.5))}
-      ${field('矢尻サイズ',   numberEl('coilHeadSize',  edge.annotations.coilStyle?.headSize  ?? 5,   2,  20))}
-      ${field('巻き直径',     numberEl('coilRadius',    edge.annotations.coilStyle?.radius    ?? 10,  5,  40))}
-      ${field('エッジとの距離', numberEl('coilGap',     edge.annotations.coilStyle?.gap       ?? 12,  0,  60))}
+      ${field('Position t',       rangeEl('coilT', edge.annotations.coilT ?? 0.5, tStep))}
+      ${field('Side',         radioGroup('coilSide', edge.annotations.coilSide ?? 'above', [['above','Above (Left)'],['below','Below (Right)']]))}
+      ${field('Line Thickness',     numberEl('coilThickness', edge.annotations.coilStyle?.thickness ?? 1.5, 0.5, 6, 0.5))}
+      ${field('Head Size',   numberEl('coilHeadSize',  edge.annotations.coilStyle?.headSize  ?? 5,   2,  20))}
+      ${field('Coil Diameter',     numberEl('coilRadius',    edge.annotations.coilStyle?.radius    ?? 10,  5,  40))}
+      ${field('Distance from Edge', numberEl('coilGap',     edge.annotations.coilStyle?.gap       ?? 12,  0,  60))}
     ` : ''}
-    ${field('ルーティング', radioGroup('routing', edge.routing, [['orthogonal','折れ線'],['diagonal','斜め直線']]))}
-    ${field('線種',         radioGroup('lineType', edge.arrowStyle.type, [['normal','実線'],['dashed','破線']]))}
-    ${field('太さ',         numberEl('thickness', edge.arrowStyle.thickness, 1, 6))}
-    ${field('矢じりサイズ', numberEl('headSize',  edge.arrowStyle.headSize,  4, 20))}
+    ${field('Routing', radioGroup('routing', edge.routing, [['orthogonal','Orthogonal'],['diagonal','Diagonal']]))}
+    ${field('Line Type',         radioGroup('lineType', edge.arrowStyle.type, [['normal','Solid'],['dashed','Dashed']]))}
+    ${field('Thickness',         numberEl('thickness', edge.arrowStyle.thickness, 1, 6))}
+    ${field('Head Size', numberEl('headSize',  edge.arrowStyle.headSize,  4, 20))}
 
     <div style="margin:14px 0 6px;border-top:1px solid #e2e8f0;padding-top:12px;">
-      <h4 style="font-size:11px;font-weight:600;color:#64748b;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px;">垂直アノテーション</h4>
+      <h4 style="font-size:11px;font-weight:600;color:#64748b;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px;">Vertical Annotations</h4>
       <div id="annot-list">${items.map((it, i) => annotItemHTML(it, i, tStep)).join('')}</div>
-      <button id="btn-add-annot" style="${BTN_STYLE}margin-top:6px;width:100%;">＋ アノテーション追加</button>
+      <button id="btn-add-annot" style="${BTN_STYLE}margin-top:6px;width:100%;">+ Add Annotation</button>
     </div>
   `;
 
@@ -101,7 +153,7 @@ function renderEdgePanel(edge, updateFn, tStep) {
   wireAnnotItems(edge, updateFn);
 
   document.getElementById('btn-add-annot').addEventListener('click', () => {
-    const newItem = { id: uid(), side: 'above', t: 0.5, label: '', shape: 'none', dist: 40, showArrow: true, snap: true };
+    const newItem = { id: uid(), side: 'above', t: 0.5, label: '', shape: 'none', dist: 40, showArrow: true, snap: true, arrowGap: 2 };
     updateFn(edge.id, { annotations: { items: [...items, newItem] } });
   });
 }
@@ -111,16 +163,17 @@ function annotItemHTML(item, idx, tStep) {
   return `
   <div data-annot-id="${item.id}" style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <span style="font-size:11px;font-weight:600;color:#94a3b8;">アノテーション ${idx + 1}</span>
-      <button data-del-annot="${item.id}" style="font-size:11px;color:#dc2626;background:none;border:none;cursor:pointer;padding:2px 4px;">削除</button>
+      <span style="font-size:11px;font-weight:600;color:#94a3b8;">Annotation ${idx + 1}</span>
+      <button data-del-annot="${item.id}" style="font-size:11px;color:#dc2626;background:none;border:none;cursor:pointer;padding:2px 4px;">Delete</button>
     </div>
-    ${field('ラベル',     textarea(`annot-label-${item.id}`, item.label, 2))}
-    ${field('方向',       radioGroup(`annot-side-${item.id}`, item.side, [['above','上（法線左）'],['below','下（法線右）']]))}
-    ${field('位置 t',     rangeEl(`annot-t-${item.id}`, item.t, itemStep))}
-    ${field('t スナップ', checkboxEl(`annot-snap-${item.id}`, item.snap ?? true))}
-    ${field('形状',       selectEl(`annot-shape-${item.id}`, item.shape, [['none','なし'],['box','矩形']]))}
-    ${field('距離',       numberEl(`annot-dist-${item.id}`, item.dist ?? 40, 10, 200))}
-    ${field('矢印表示',   checkboxEl(`annot-arrow-${item.id}`, item.showArrow ?? true))}
+    ${field('Label',     textarea(`annot-label-${item.id}`, item.label, 2))}
+    ${field('Side',       radioGroup(`annot-side-${item.id}`, item.side, [['above','Above (Left)'],['below','Below (Right)']]))}
+    ${field('Position t',     rangeEl(`annot-t-${item.id}`, item.t, itemStep))}
+    ${field('Snap t', checkboxEl(`annot-snap-${item.id}`, item.snap ?? true))}
+    ${field('Shape',       selectEl(`annot-shape-${item.id}`, item.shape, [['none','None'],['box','Box']]))}
+    ${field('Distance',       numberEl(`annot-dist-${item.id}`, item.dist ?? 40, 10, 200))}
+    ${field('Show Arrow',   checkboxEl(`annot-arrow-${item.id}`, item.showArrow ?? true))}
+    ${field('Arrow Gap', numberEl(`annot-gap-${item.id}`, item.arrowGap ?? 2, 0, 40))}
   </div>`;
 }
 
@@ -162,6 +215,9 @@ function wireAnnotItems(edge, updateFn) {
 
     const arrowEl = panelEl.querySelector(`input[name="annot-arrow-${id}"]`);
     if (arrowEl) arrowEl.addEventListener('change', () => updateItem(id, { showArrow: arrowEl.checked }));
+
+    const gapEl = panelEl.querySelector(`input[name="annot-gap-${id}"]`);
+    if (gapEl) gapEl.addEventListener('input', () => updateItem(id, { arrowGap: Number(gapEl.value) }));
 
     const delBtn = panelEl.querySelector(`[data-del-annot="${id}"]`);
     if (delBtn) delBtn.addEventListener('click', () => {

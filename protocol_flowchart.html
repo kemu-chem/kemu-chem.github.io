@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>実験プロトコル フローチャート</title>
+  <title>Protocol Flowchart</title>
   <style>
     :root { --primary: #2563eb; --border: #e2e8f0; --bg: #f8fafc; --panel-w: 280px; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -58,9 +58,10 @@
         linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
       background-size: 40px 40px;
     }
-    #editor-svg { width: 100%; height: 100%; display: block; cursor: grab; }
-    #editor-svg.connect-mode { cursor: crosshair; }
+    #editor-svg { width: 100%; height: 100%; display: block; cursor: grab; user-select: none; }
     #editor-svg.panning { cursor: grabbing; }
+    .hover-action { fill: #2563eb; fill-opacity: 0.2; transition: fill-opacity 0.15s; }
+    .hover-action:hover { fill-opacity: 0.65; }
 
     /* ── Panel ── */
     #panel-container {
@@ -69,6 +70,15 @@
       overflow-y: auto; padding: 14px;
     }
     .panel-empty { color: #94a3b8; font-size: 13px; margin-top: 20px; text-align: center; }
+
+    /* ── Inline text editor ── */
+    #inline-edit {
+      position: fixed; display: none; resize: none; overflow: hidden;
+      border: 2px solid var(--primary); border-radius: 4px;
+      padding: 4px 8px; text-align: center; background: white;
+      z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,.18);
+      outline: none; line-height: 1.4; box-sizing: border-box;
+    }
 
     /* ── Status bar ── */
     #statusbar {
@@ -86,31 +96,49 @@
 <body>
 
 <div id="toolbar">
-  <input id="title-input" type="text" value="Protocol Flowchart" placeholder="タイトル">
+  <input id="title-input" type="text" value="Protocol Flowchart" placeholder="Title">
   <div class="tb-sep"></div>
 
-  <span class="tb-label">編集</span>
-  <button class="tb-btn" id="btn-add-node">＋ ノード追加</button>
-  <button class="tb-btn" id="btn-branch-up">↑ 分岐</button>
-  <button class="tb-btn" id="btn-branch-down">↓ 分岐</button>
-  <button class="tb-btn" id="btn-connect-mode">→ 接続</button>
-  <button class="tb-btn danger" id="btn-delete">削除</button>
+  <span class="tb-label">Edit</span>
+  <button class="tb-btn" id="btn-add-node">+ Add Node</button>
+  <button class="tb-btn" id="btn-branch-up">↑ Branch Up</button>
+  <button class="tb-btn" id="btn-branch-down">↓ Branch Down</button>
+  <button class="tb-btn" id="btn-connect-mode">→ Connect</button>
+  <button class="tb-btn" id="btn-select-all-nodes">Select All Nodes</button>
+  <button class="tb-btn" id="btn-select-all-edges">Select All Edges</button>
+  <button class="tb-btn danger" id="btn-delete">Delete</button>
   <div class="tb-sep"></div>
 
-  <span class="tb-label">表示</span>
-  <button class="tb-btn" id="btn-relayout">整列リセット</button>
-  <button class="tb-btn active" id="btn-snap">スナップ</button>
+  <span class="tb-label">View</span>
+  <button class="tb-btn" id="btn-relayout">Reset Layout</button>
+  <button class="tb-btn active" id="btn-snap">Snap</button>
   <input id="snap-step" type="number" value="0.25" min="0.01" max="1" step="0.05"
-    title="スナップ刻み幅"
+    title="Snap Step"
     style="width:58px;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;color:#334155;">
-  <button class="tb-btn active" id="btn-grid-snap">グリッド</button>
+  <button class="tb-btn active" id="btn-grid-snap">Grid</button>
+  <input id="grid-size" type="number" value="40" min="1" max="200" step="1"
+    title="Grid size (px)"
+    style="width:52px;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;color:#334155;">
   <div class="tb-sep"></div>
 
-  <span class="tb-label">出力</span>
-  <button class="tb-btn" id="btn-export-svg">SVG保存</button>
-  <button class="tb-btn" id="btn-export-pptx">PPTX出力</button>
-  <button class="tb-btn" id="btn-save-json">JSON保存</button>
-  <button class="tb-btn" id="btn-load-json">JSON読込</button>
+  <span class="tb-label">Font</span>
+  <select id="font-select" style="padding:4px 6px;font-size:13px;border:1px solid var(--border);border-radius:4px;color:#334155;background:white;cursor:pointer;">
+    <option value="sans-serif">Sans-serif</option>
+    <option value="serif">Serif</option>
+    <option value="monospace">Monospace</option>
+    <option value="Arial">Arial</option>
+    <option value="Helvetica">Helvetica</option>
+    <option value="Times New Roman">Times New Roman</option>
+    <option value="Georgia">Georgia</option>
+    <option value="Courier New">Courier New</option>
+  </select>
+  <div class="tb-sep"></div>
+
+  <span class="tb-label">Export</span>
+  <button class="tb-btn" id="btn-export-svg">Save SVG</button>
+  <button class="tb-btn" id="btn-export-pptx">PPTXExport</button>
+  <button class="tb-btn" id="btn-save-json">Save JSON</button>
+  <button class="tb-btn" id="btn-load-json">Load JSON</button>
   <input type="file" id="json-file-input" accept=".json" style="display:none">
 </div>
 
@@ -119,11 +147,12 @@
     <svg id="editor-svg" xmlns="http://www.w3.org/2000/svg"></svg>
   </div>
   <div id="panel-container">
-    <p class="panel-empty">ノードまたはエッジを選択してください</p>
+    <p class="panel-empty">Please select a node or edge</p>
   </div>
 </div>
 
-<div id="statusbar">ノード: 0 ／ エッジ: 0</div>
+<div id="statusbar">Nodes: 0 / Edges: 0</div>
 
+<textarea id="inline-edit"></textarea>
 </body>
 </html>

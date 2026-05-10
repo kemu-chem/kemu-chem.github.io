@@ -1,7 +1,7 @@
 import { findNode } from '../core/graph.js';
 
 const PAD        = 14;   // Node shape padding
-const COIL_R     = 10;   // 巻矢印 arc radius
+const COIL_R     = 10;   // Coil arrow arc radius
 const ANNOT_DIST = 40;   // px from edge to annotation box center
 
 // ── Public entry point ────────────────────────────────────────────────────────
@@ -9,6 +9,8 @@ const ANNOT_DIST = 40;   // px from edge to annotation box center
 export function renderSVG(graph, opts = {}) {
   const width  = opts.width  ?? 1200;
   const height = opts.height ?? 600;
+
+  const fontFamily = graph.meta?.fontFamily ?? 'sans-serif';
 
   const parts = [];
   parts.push(svgOpen(width, height));
@@ -26,11 +28,11 @@ export function renderSVG(graph, opts = {}) {
     const from = findNode(graph, edge.fromId);
     const to   = findNode(graph, edge.toId);
     if (!from || !to) continue;
-    parts.push(renderEdge(edge, from, to, `arrow-${edge.id}`));
+    parts.push(renderEdge(edge, from, to, `arrow-${edge.id}`, fontFamily));
   }
 
   for (const node of graph.nodes) {
-    parts.push(renderNode(node));
+    parts.push(renderNode(node, {}, fontFamily));
   }
 
   parts.push('</svg>');
@@ -39,23 +41,30 @@ export function renderSVG(graph, opts = {}) {
 
 // ── Node rendering ────────────────────────────────────────────────────────────
 
-function renderNode(node, overrideStyle = {}) {
-  const style  = { ...node.style, ...overrideStyle };
-  const lines  = String(node.label || ' ').split('\n');
+function renderNode(node, overrideStyle = {}, fontFamily = 'sans-serif') {
+  const style    = { ...node.style, ...overrideStyle };
+  const labelStr = String(node.label || '');
+  const { x, y, shape } = node;
+  const stroke   = style.borderColor ?? '#333333';
+
+  // Empty label → invisible junction; render a tiny dot as visual cue
+  if (!labelStr.trim()) {
+    return `<circle cx="${x}" cy="${y}" r="2" fill="${stroke}"/>`;
+  }
+
+  const lines  = labelStr.split('\n');
   const fs     = style.fontSize ?? 14;
   const lineH  = fs * 1.4;
   const textW  = Math.max(...lines.map(l => l.length)) * fs * 0.6;
   const textH  = lines.length * lineH;
   const w      = textW + PAD * 2;
   const h      = textH + PAD * 2;
-  const { x, y, shape } = node;
-  const fill   = style.fillColor   ?? '#ffffff';
-  const stroke = style.borderColor ?? '#333333';
+  const fill   = style.fillColor ?? '#ffffff';
 
   const textEl = lines.map((l, i) =>
     `<tspan x="${x}" dy="${i === 0 ? -(lines.length - 1) * lineH / 2 : lineH}">${esc(l)}</tspan>`
   ).join('');
-  const label = `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${fs}" fill="${stroke}" font-family="sans-serif">${textEl}</text>`;
+  const label = `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${fs}" fill="${stroke}" font-family="${fontFamily}">${textEl}</text>`;
 
   if (shape === 'none') return label;
 
@@ -74,7 +83,7 @@ function renderNode(node, overrideStyle = {}) {
 
 // ── Edge rendering ────────────────────────────────────────────────────────────
 
-function renderEdge(edge, from, to, markerId) {
+function renderEdge(edge, from, to, markerId, fontFamily = 'sans-serif') {
   const parts = [];
   const { thickness, headSize, type } = edge.arrowStyle;
   const dashed = type === 'dashed' ? `stroke-dasharray="${headSize * 1.5} ${headSize}"` : '';
@@ -86,7 +95,7 @@ function renderEdge(edge, from, to, markerId) {
 
   parts.push(`<path d="${path}" fill="none" stroke="${color}" stroke-width="${thickness}" ${dashed} marker-end="url(#${markerId})"/>`);
 
-  // 巻矢印
+  // Coil arrow
   if (edge.annotations.coil) {
     const t         = edge.annotations.coilT    ?? 0.5;
     const side      = edge.annotations.coilSide ?? 'above';
@@ -102,7 +111,7 @@ function renderEdge(edge, from, to, markerId) {
 
   // Perpendicular annotation items
   for (const item of (edge.annotations.items ?? [])) {
-    parts.push(renderAnnotationItem(item, edge, from, to));
+    parts.push(renderAnnotationItem(item, edge, from, to, fontFamily));
   }
 
   return parts.join('\n');
@@ -110,7 +119,7 @@ function renderEdge(edge, from, to, markerId) {
 
 // ── Annotation item rendering ─────────────────────────────────────────────────
 
-function renderAnnotationItem(item, edge, from, to) {
+function renderAnnotationItem(item, edge, from, to, fontFamily = 'sans-serif') {
   const edgePt = pointOnPath(edge, from, to, item.t ?? 0.5);
   const pd     = perpDir(edgePt.tx, edgePt.ty, item.side ?? 'above');
   const dist = item.dist ?? ANNOT_DIST;
@@ -125,14 +134,21 @@ function renderAnnotationItem(item, edge, from, to) {
   };
 
   const showArrow = item.showArrow ?? true;
+  const arrowGap  = item.arrowGap  ?? 2;
   const arrowLine = showArrow
     ? (() => {
-        const bp = borderPoint(proxy, edgePt.x, edgePt.y);
-        return `<line x1="${bp.x.toFixed(1)}" y1="${bp.y.toFixed(1)}" x2="${edgePt.x.toFixed(1)}" y2="${edgePt.y.toFixed(1)}" stroke="#555" stroke-width="1.5" marker-end="url(#annot-arrow)"/>`;
+        const bp  = borderPoint(proxy, edgePt.x, edgePt.y);
+        const len = Math.hypot(edgePt.x - bp.x, edgePt.y - bp.y);
+        const nx  = len > 0 ? (edgePt.x - bp.x) / len : 0;
+        const ny  = len > 0 ? (edgePt.y - bp.y) / len : 0;
+        const x1  = bp.x + arrowGap * nx;
+        const y1  = bp.y + arrowGap * ny;
+        return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${edgePt.x.toFixed(1)}" y2="${edgePt.y.toFixed(1)}" stroke="#555" stroke-width="1.5" marker-end="url(#annot-arrow)"/>`;
       })()
     : '';
 
-  return renderNode(proxy) + (arrowLine ? '\n' + arrowLine : '');
+  const content = renderNode(proxy, {}, fontFamily) + (arrowLine ? '\n' + arrowLine : '');
+  return `<g data-id="${item.id}" data-type="annot" data-edge-id="${edge.id}" style="cursor:pointer">\n${content}\n</g>`;
 }
 
 // ── Path position & geometry ──────────────────────────────────────────────────
@@ -186,7 +202,9 @@ function perpDir(tx, ty, side) {
 // ── Node geometry helpers ─────────────────────────────────────────────────────
 
 function nodeDims(node) {
-  const lines = String(node.label || ' ').split('\n');
+  const labelStr = String(node.label || '');
+  if (!labelStr.trim()) return { w: 0, h: 0 };
+  const lines = labelStr.split('\n');
   const fs    = node.style?.fontSize ?? 14;
   const w     = Math.max(...lines.map(l => l.length)) * fs * 0.6 + PAD * 2;
   const h     = lines.length * fs * 1.4 + PAD * 2;
@@ -198,6 +216,7 @@ export function borderPoint(node, tx, ty) {
   const { w, h } = nodeDims(node);
   const dx = tx - x, dy = ty - y;
   if (dx === 0 && dy === 0) return { x, y };
+  if (w === 0 && h === 0) return { x, y };
 
   if (shape === 'circle') {
     const r = Math.max(w, h) / 2, len = Math.hypot(dx, dy);
@@ -233,7 +252,7 @@ function diagonalPath(from, to) {
   return `M ${s.x} ${s.y} L ${e.x} ${e.y}`;
 }
 
-// ── 巻矢印 ────────────────────────────────────────────────────────────────────
+// ── Coil arrow ────────────────────────────────────────────────────────────────
 
 function coilArrow(cx, cy, r, thickness, headSize) {
   const startAngle = -80  * Math.PI / 180;

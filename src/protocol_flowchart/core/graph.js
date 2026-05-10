@@ -10,6 +10,7 @@ export function createGraph(meta = {}) {
       defaultRouting: meta.defaultRouting ?? 'orthogonal',
       cellW: meta.cellW ?? 180,
       cellH: meta.cellH ?? 100,
+      fontFamily: meta.fontFamily ?? 'sans-serif',
     },
   };
 }
