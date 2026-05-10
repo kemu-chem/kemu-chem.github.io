@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NMR J-Peak Analyzer</title>
+    <link rel="stylesheet" href="../../main_style.css">
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1PK2SJTJ75"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'G-1PK2SJTJ75');
+    </script>
+    <style>
+        :root {
+            --bg: #f8fafc; --card-bg: #ffffff; --text: #1e293b;
+            --text-muted: #64748b; --text-dim: #94a3b8; --border: #e2e8f0;
+            --input-bg: #f1f5f9; --input-border: #cbd5e1;
+            --btn-bg: #2563eb; --btn-text: #ffffff; --btn-hover: #1d4ed8;
+            --btn-secondary-bg: #f1f5f9; --btn-secondary-text: #475569; --btn-secondary-hover: #e2e8f0;
+            --drop-bg: #f8fafc; --drop-border: #cbd5e1;
+            --drop-active-bg: #eff6ff; --drop-active-border: #2563eb;
+            --table-header-bg: #f1f5f9; --table-row-hover: #f8fafc; --table-row-alt: #fafbfc;
+            --tag-bg: #e0f2fe; --tag-text: #0369a1;
+            --axis-color: #475569; --svg-bg: #fafbfc;
+        }
+        [data-theme="dark"] {
+            --bg: #0f172a; --card-bg: #1e293b; --text: #e2e8f0;
+            --text-muted: #94a3b8; --text-dim: #64748b; --border: #334155;
+            --input-bg: #1e293b; --input-border: #475569;
+            --btn-bg: #3b82f6; --btn-text: #ffffff; --btn-hover: #2563eb;
+            --btn-secondary-bg: #334155; --btn-secondary-text: #cbd5e1; --btn-secondary-hover: #475569;
+            --drop-bg: #162032; --drop-border: #475569;
+            --drop-active-bg: #1e3a5f; --drop-active-border: #3b82f6;
+            --table-header-bg: #162032; --table-row-hover: #1e293b; --table-row-alt: #182030;
+            --tag-bg: #0c2d48; --tag-text: #38bdf8;
+            --axis-color: #94a3b8; --svg-bg: #162032;
+        }
+
+        body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
+        .card { background: var(--card-bg); transition: background 0.3s; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        h1 { font-size: 1.5em; margin: 0; color: var(--text); }
+        .theme-toggle {
+            background: none; border: 1px solid var(--border); border-radius: 8px;
+            padding: 6px 10px; cursor: pointer; font-size: 18px; color: var(--text-muted);
+            transition: border-color 0.2s, color 0.2s; line-height: 1;
+        }
+        .theme-toggle:hover { border-color: var(--btn-bg); color: var(--btn-bg); }
+
+        .settings-grid {
+            display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+            padding: 14px 16px; background: var(--table-header-bg);
+            border-radius: 8px; border: 1px solid var(--border);
+        }
+        .setting-item { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .setting-item label { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+        .setting-input {
+            width: 80px; padding: 5px 8px; border: 1px solid var(--input-border);
+            border-radius: 6px; background: var(--input-bg); color: var(--text);
+            font-size: 13px; outline: none; transition: border-color 0.2s;
+        }
+        .setting-input:focus { border-color: var(--btn-bg); }
+        .setting-unit { font-size: 12px; color: var(--text-dim); }
+
+        .drop-zone {
+            border: 2px dashed var(--drop-border); border-radius: 10px; background: var(--drop-bg);
+            padding: 28px 20px; text-align: center; cursor: pointer;
+            transition: background 0.2s, border-color 0.2s; margin-bottom: 12px;
+            color: var(--text-muted); font-size: 14px;
+        }
+        .drop-zone:hover, .drop-zone.drag-over {
+            background: var(--drop-active-bg); border-color: var(--drop-active-border); color: var(--btn-bg);
+        }
+        .drop-zone .drop-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+        .file-actions { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .btn {
+            padding: 8px 16px; border-radius: 7px; border: none; cursor: pointer;
+            font-size: 13px; font-weight: 500; transition: background 0.15s, opacity 0.15s;
+        }
+        .btn-primary { background: var(--btn-bg); color: var(--btn-text); }
+        .btn-primary:hover { background: var(--btn-hover); }
+        .btn-secondary { background: var(--btn-secondary-bg); color: var(--btn-secondary-text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: var(--btn-secondary-hover); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .spectrum-section { margin-bottom: 12px; }
+        .spectrum-section.hidden { display: none; }
+        .spectrum-container {
+            position: relative; width: 100%; overflow: hidden;
+            border: 1px solid var(--border); border-radius: 8px;
+            background: var(--svg-bg); touch-action: none;
+            user-select: none; -webkit-user-select: none; cursor: grab;
+            height: clamp(180px, 45vh, 560px);
+        }
+        .spectrum-container:active { cursor: grabbing; }
+        .spectrum-svg { display: block; width: 100%; height: 100%; }
+        .spectrum-controls { display: flex; gap: 4px; margin-top: 6px; margin-bottom: 12px; justify-content: flex-end; }
+        .zoom-btn {
+            padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px;
+            background: var(--btn-secondary-bg); color: var(--btn-secondary-text);
+            cursor: pointer; font-size: 13px; transition: all 0.15s;
+        }
+        .zoom-btn:hover { border-color: var(--btn-bg); color: var(--btn-bg); }
+
+        .summary-bar {
+            display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+            background: var(--table-header-bg); border: 1px solid var(--border);
+            border-radius: 8px; margin-bottom: 12px; font-size: 13px;
+            color: var(--text-muted); flex-wrap: wrap;
+        }
+        .summary-bar.hidden { display: none; }
+        .tag { background: var(--tag-bg); color: var(--tag-text); border-radius: 20px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+
+        .table-wrapper { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+        .table-wrapper.hidden { display: none; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead th {
+            background: var(--table-header-bg); color: var(--text-muted); font-weight: 600;
+            padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border);
+            white-space: nowrap; cursor: pointer; user-select: none;
+        }
+        thead th:hover { color: var(--btn-bg); }
+        thead th .si { display: inline-block; margin-left: 4px; opacity: 0.4; font-size: 10px; }
+        thead th.sort-asc .si::after { content: '▲'; opacity: 1; }
+        thead th.sort-desc .si::after { content: '▼'; opacity: 1; }
+        thead th:not(.sort-asc):not(.sort-desc) .si::after { content: '⇅'; }
+        tbody tr:nth-child(even) { background: var(--table-row-alt); }
+        tbody tr:hover { background: var(--table-row-hover); cursor: pointer; }
+        tbody td { padding: 8px 14px; border-bottom: 1px solid var(--border); color: var(--text); font-variant-numeric: tabular-nums; }
+        tbody tr:last-child td { border-bottom: none; }
+        .group-cell { font-weight: 600; color: var(--text-muted); }
+        .j-cell { font-weight: 700; color: var(--btn-bg); }
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--text-dim); font-size: 14px; }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 1.2em; }
+            .settings-grid { gap: 8px; }
+            .setting-input { width: 65px; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <a href="../../index.html" class="portal-btn">&#8592; Portal</a>
+
+        <div class="header-row">
+            <h1>NMR J-Peak Analyzer</h1>
+            <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">&#9790;</button>
+        </div>
+
+        <div class="settings-grid">
+            <div class="setting-item">
+                <label for="freqInput">Spectrometer</label>
+                <input type="number" class="setting-input" id="freqInput" value="400" min="60" max="1200" step="1">
+                <span class="setting-unit">MHz</span>
+            </div>
+            <div class="setting-item">
+                <label for="gapInput">Multiplet gap</label>
+                <input type="number" class="setting-input" id="gapInput" value="0.05" min="0.001" max="1" step="0.005">
+                <span class="setting-unit">ppm</span>
+            </div>
+            <div class="setting-item">
+                <label for="thresholdInput">J threshold</label>
+                <input type="number" class="setting-input" id="thresholdInput" value="20" min="0.1" max="500" step="0.5">
+                <span class="setting-unit">Hz (upper)</span>
+            </div>
+        </div>
+
+        <div class="drop-zone" id="dropZone">
+            <span class="drop-icon">📂</span>
+            Drop <code>peaklist.xml</code> here, or click to browse
+        </div>
+        <input type="file" id="fileInput" accept=".xml" style="display:none">
+
+        <div class="file-actions">
+            <button class="btn btn-secondary" id="browseBtn">Browse XML…</button>
+            <button class="btn btn-secondary" id="loadExampleBtn">Load Example (tools/peaklist.xml)</button>
+            <button class="btn btn-primary" id="downloadBtn" disabled>Download CSV</button>
+        </div>
+
+        <div class="spectrum-section hidden" id="spectrumSection">
+            <div class="spectrum-container" id="spectrumContainer">
+                <svg class="spectrum-svg" id="spectrumSvg"></svg>
+            </div>
+            <div class="spectrum-controls">
+                <button class="zoom-btn" id="zoomIn">+</button>
+                <button class="zoom-btn" id="zoomOut">&minus;</button>
+                <button class="zoom-btn" id="zoomReset">Reset</button>
+            </div>
+        </div>
+
+        <div class="summary-bar hidden" id="summaryBar">
+            <span id="summaryText"></span>
+        </div>
+
+        <div class="table-wrapper hidden" id="tableWrapper">
+            <table id="resultsTable">
+                <thead>
+                    <tr>
+                        <th data-col="group">Group<span class="si"></span></th>
+                        <th data-col="center">Center (ppm)<span class="si"></span></th>
+                        <th data-col="peakA">Peak A (ppm)<span class="si"></span></th>
+                        <th data-col="peakB">Peak B (ppm)<span class="si"></span></th>
+                        <th data-col="deltaPpm">&Delta;ppm<span class="si"></span></th>
+                        <th data-col="jHz">J (Hz)<span class="si"></span></th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script type="module">
+    import { parseBrukerXML }  from '../../src/NMR_Analysis/peaklist_parser.js';
+    import { buildGroupsFlat } from '../../src/NMR_Analysis/peak_grouper.js';
+    import { computeJ }        from '../../src/NMR_Analysis/j_calculator.js';
+    import { groupColor }      from '../../src/NMR_Analysis/nmr_colors.js';
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    let allResults    = [];
+    let allGroupsFlat = [];
+    let sortCol = 'group', sortAsc = true;
+    let lastXmlText   = null;
+
+    // ── Spectrum ──────────────────────────────────────────────────────────────
+    const Spectrum = (() => {
+        const NS = 'http://www.w3.org/2000/svg';
+        const M  = { top: 44, right: 32, bottom: 38, left: 15 };
+        let svgEl, containerEl;
+        let W = 800, H = 280;
+        let vMin, vMax, dMin, dMax;
+        let gData = [], jData = [];
+        let highlightGid = null;
+
+        function init(container, svg) {
+            containerEl = container;
+            svgEl = svg;
+            resize();
+            window.addEventListener('resize', () => { resize(); if (gData.length) render(); });
+        }
+
+        function resize() {
+            const r = containerEl.getBoundingClientRect();
+            W = Math.max(r.width, 300);
+            H = r.height > 10 ? r.height : Math.min(Math.max(W * 0.38, 180), 560);
+            svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+        }
+
+        function setData(groups, results, pMin, pMax) {
+            gData = groups; jData = results;
+            dMin = vMin = pMin; dMax = vMax = pMax;
+            resize();
+            render();
+        }
+
+        const bY      = () => H - M.bottom;
+        const pH      = () => bY() - M.top;
+        const pW      = () => W - M.left - M.right;
+        const ppmToX  = ppm => M.left + pW() * (1 - (ppm - vMin) / (vMax - vMin));
+
+        function mk(tag, attrs = {}) {
+            const el = document.createElementNS(NS, tag);
+            for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+            return el;
+        }
+
+        function render() {
+            svgEl.innerHTML = '';
+            if (!gData.length) return;
+
+            const allPeaks = gData.flatMap(g =>
+                g.peaks.map(p => ({ ...p, gid: g.gid, color: g.color, isMultiplet: g.isMultiplet }))
+            );
+            const maxI  = Math.max(...allPeaks.map(p => p.intensity));
+            const MAX_H = pH() * 0.62;
+            const peakH = i => Math.min(Math.sqrt(i / maxI) * MAX_H * 1.2, MAX_H);
+
+            const groupMaxH = new Map();
+            gData.forEach(g => {
+                groupMaxH.set(g.gid, g.isMultiplet ? Math.max(...g.peaks.map(p => peakH(p.intensity))) : 0);
+            });
+
+            drawAxis();
+            drawJBrackets(peakH, groupMaxH);
+            drawGroupBars();
+            drawPeaks(allPeaks, peakH);
+        }
+
+        function drawAxis() {
+            const g = mk('g');
+            const y = bY();
+            g.appendChild(mk('line', { x1: M.left, y1: y, x2: W - M.right, y2: y, stroke: 'var(--axis-color)', 'stroke-width': 1 }));
+            const range = vMax - vMin;
+            const step  = range > 8 ? 2 : range > 4 ? 1 : range > 2 ? 0.5 : range > 0.5 ? 0.2 : 0.1;
+            const start = Math.ceil(vMin / step) * step;
+            for (let ppm = start; ppm <= vMax + 0.001; ppm += step) {
+                const x = ppmToX(ppm);
+                if (x < M.left || x > W - M.right) continue;
+                g.appendChild(mk('line', { x1: x, y1: y, x2: x, y2: y + 7, stroke: 'var(--axis-color)', 'stroke-width': 0.8 }));
+                const lbl = mk('text', { x, y: y + 18, 'text-anchor': 'middle', 'font-size': '10', 'font-family': 'system-ui,sans-serif' });
+                lbl.setAttribute('fill', 'var(--text-muted)');
+                lbl.textContent = ppm.toFixed(step < 0.1 ? 2 : step < 1 ? 1 : 0);
+                g.appendChild(lbl);
+            }
+            const u = mk('text', { x: W - M.right + 4, y: y + 5, 'font-size': '9', 'text-anchor': 'start', 'font-style': 'italic', 'font-family': 'system-ui,sans-serif' });
+            u.setAttribute('fill', 'var(--text-dim)');
+            u.textContent = 'ppm';
+            g.appendChild(u);
+            svgEl.appendChild(g);
+        }
+
+        function drawGroupBars() {
+            gData.forEach(g => {
+                if (!g.isMultiplet || g.peaks.length < 2) return;
+                const x1 = ppmToX(g.peaks[0].f1);
+                const x2 = ppmToX(g.peaks[g.peaks.length - 1].f1);
+                const w  = Math.abs(x2 - x1);
+                if (w < 1 || x1 > W - M.right + 5 || x2 < M.left - 5) return;
+                const op = highlightGid !== null ? (g.gid === highlightGid ? 0.9 : 0.15) : 0.7;
+                svgEl.appendChild(mk('rect', { x: Math.min(x1, x2), y: bY() + 3, width: Math.max(w, 2), height: 3, fill: g.color, rx: 1.5, opacity: op }));
+            });
+        }
+
+        function drawPeaks(allPeaks, peakH) {
+            const g = mk('g');
+            allPeaks.forEach(p => {
+                const x = ppmToX(p.f1);
+                if (x < M.left - 5 || x > W - M.right + 5) return;
+                const color = p.isMultiplet ? p.color : 'var(--text-dim)';
+                const op    = highlightGid !== null ? (p.gid === highlightGid ? 1 : 0.08) : 0.85;
+                g.appendChild(mk('line', { x1: x, y1: bY(), x2: x, y2: bY() - peakH(p.intensity), stroke: color, 'stroke-width': 1.5, opacity: op, 'stroke-linecap': 'round' }));
+            });
+            svgEl.appendChild(g);
+        }
+
+        function drawJBrackets(peakH, groupMaxH) {
+            const byGroup = new Map();
+            jData.forEach(r => {
+                if (!byGroup.has(r.group)) byGroup.set(r.group, []);
+                byGroup.get(r.group).push(r);
+            });
+
+            const g = mk('g');
+            const TICK = 4, LABEL_MIN_PX = 28;
+
+            byGroup.forEach((pairs, gid) => {
+                const gInfo    = gData.find(g => g.gid === gid);
+                const color    = gInfo ? gInfo.color : '#888';
+                const maxPH    = groupMaxH.get(gid) || 50;
+                const bracketY = bY() - maxPH - 10;
+                if (bracketY < M.top + 6) return;
+
+                const op = highlightGid !== null ? (highlightGid === gid ? 1 : 0.07) : 0.88;
+
+                pairs.forEach(r => {
+                    const lx   = Math.min(ppmToX(r.peakA), ppmToX(r.peakB));
+                    const rx   = Math.max(ppmToX(r.peakA), ppmToX(r.peakB));
+                    if (rx < M.left - 5 || lx > W - M.right + 5) return;
+                    g.appendChild(mk('line', { x1: lx, y1: bracketY, x2: rx, y2: bracketY, stroke: color, 'stroke-width': 0.9, opacity: op }));
+                    g.appendChild(mk('line', { x1: lx, y1: bracketY, x2: lx, y2: bracketY + TICK, stroke: color, 'stroke-width': 0.9, opacity: op }));
+                    g.appendChild(mk('line', { x1: rx, y1: bracketY, x2: rx, y2: bracketY + TICK, stroke: color, 'stroke-width': 0.9, opacity: op }));
+                    if (rx - lx >= LABEL_MIN_PX) {
+                        const lbl = mk('text', { x: (lx + rx) / 2, y: bracketY - 2, 'text-anchor': 'middle', 'font-size': '8', 'font-family': 'system-ui,sans-serif', opacity: op });
+                        lbl.setAttribute('fill', color);
+                        lbl.textContent = r.jHz.toFixed(1) + ' Hz';
+                        g.appendChild(lbl);
+                    }
+                });
+            });
+            svgEl.appendChild(g);
+        }
+
+        function zoom(factor) {
+            const c    = (vMin + vMax) / 2;
+            const half = (vMax - vMin) / 2 * factor;
+            vMin = Math.max(c - half, dMin - 0.5);
+            vMax = Math.min(c + half, dMax + 0.5);
+            if (vMax - vMin < 0.02) { vMin = c - 0.01; vMax = c + 0.01; }
+            render();
+        }
+
+        function pan(deltaPpm) {
+            const range = vMax - vMin;
+            let lo = vMin + deltaPpm;
+            if (lo < dMin - 0.5)         lo = dMin - 0.5;
+            if (lo + range > dMax + 0.5) lo = dMax + 0.5 - range;
+            vMin = lo; vMax = lo + range;
+            render();
+        }
+
+        function reset() { vMin = dMin; vMax = dMax; render(); }
+        function setHighlight(gid) { highlightGid = gid; if (gData.length) render(); }
+        function zoomToGroup(gid) {
+            const g = gData.find(g => g.gid === gid);
+            if (!g || !g.peaks.length) return;
+            const lo     = g.peaks[g.peaks.length - 1].f1;
+            const hi     = g.peaks[0].f1;
+            const margin = Math.max((hi - lo) * 3, 0.3);
+            vMin = lo - margin; vMax = hi + margin;
+            render();
+        }
+
+        return {
+            init, setData, render, zoom, pan, reset, setHighlight, zoomToGroup,
+            get viewMin() { return vMin; },
+            get viewMax() { return vMax; },
+        };
+    })();
+
+    // ── Table ─────────────────────────────────────────────────────────────────
+    function renderTable(rows) {
+        const tbody = document.getElementById('resultsBody');
+        tbody.innerHTML = '';
+        if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No J values below threshold found.</td></tr>`;
+            return;
+        }
+        rows.forEach(r => {
+            const tr    = document.createElement('tr');
+            tr.dataset.gid = r.group;
+            const color = groupColor(r.group);
+            tr.innerHTML =
+                `<td class="group-cell" style="border-left:3px solid ${color};padding-left:11px">${r.group}</td>` +
+                `<td>${r.center.toFixed(4)}</td>` +
+                `<td>${r.peakA.toFixed(6)}</td>` +
+                `<td>${r.peakB.toFixed(6)}</td>` +
+                `<td>${r.deltaPpm.toFixed(6)}</td>` +
+                `<td class="j-cell">${r.jHz.toFixed(2)}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function sortAndRender() {
+        const sorted = [...allResults].sort((a, b) =>
+            sortAsc ? a[sortCol] - b[sortCol] : b[sortCol] - a[sortCol]
+        );
+        renderTable(sorted);
+    }
+
+    function showResults(results, totalPeaks, numMultiplets) {
+        allResults = results;
+        document.getElementById('summaryBar').classList.remove('hidden');
+        document.getElementById('tableWrapper').classList.remove('hidden');
+        document.getElementById('spectrumSection').classList.remove('hidden');
+        document.getElementById('summaryText').innerHTML =
+            `<span class="tag">${totalPeaks} peaks</span>` +
+            `<span class="tag">${numMultiplets} multiplet groups</span>` +
+            `<span class="tag">${results.length} J values &lt; threshold</span>`;
+        document.getElementById('downloadBtn').disabled = !results.length;
+        sortAndRender();
+    }
+
+    // ── Process XML ───────────────────────────────────────────────────────────
+    function processXML(text) {
+        lastXmlText = text;
+        try {
+            const freq = parseFloat(document.getElementById('freqInput').value);
+            const gap  = parseFloat(document.getElementById('gapInput').value);
+            const thr  = parseFloat(document.getElementById('thresholdInput').value);
+            if (isNaN(freq) || freq <= 0) { alert('Invalid frequency.'); return; }
+            if (isNaN(gap)  || gap  <= 0) { alert('Invalid multiplet gap.'); return; }
+            if (isNaN(thr)  || thr  <= 0) { alert('Invalid J threshold.'); return; }
+
+            const sections = parseBrukerXML(text);
+            if (!sections.length) { alert('No Peak1D elements found.'); return; }
+
+            allGroupsFlat   = buildGroupsFlat(sections, gap, groupColor);
+            const allPeaks  = allGroupsFlat.flatMap(g => g.peaks);
+            const allF1     = allPeaks.map(p => p.f1);
+            const results   = computeJ(allGroupsFlat, freq, thr);
+
+            showResults(results, allPeaks.length, allGroupsFlat.filter(g => g.isMultiplet).length);
+            Spectrum.setData(allGroupsFlat, results, Math.min(...allF1) - 0.15, Math.max(...allF1) + 0.15);
+        } catch (e) {
+            alert('Error: ' + e.message);
+        }
+    }
+
+    // ── CSV Export ────────────────────────────────────────────────────────────
+    function downloadCSV() {
+        const hdr  = 'Group,Center_ppm,Peak_A_ppm,Peak_B_ppm,Delta_ppm,J_Hz\n';
+        const rows = allResults.map(r =>
+            `${r.group},${r.center.toFixed(4)},${r.peakA.toFixed(6)},${r.peakB.toFixed(6)},${r.deltaPpm.toFixed(6)},${r.jHz.toFixed(2)}`
+        ).join('\n');
+        const a = Object.assign(document.createElement('a'), {
+            href: URL.createObjectURL(new Blob([hdr + rows], { type: 'text/csv' })),
+            download: 'nmr_jpeaks.csv'
+        });
+        a.click(); URL.revokeObjectURL(a.href);
+    }
+
+    function loadFile(file) {
+        const r = new FileReader();
+        r.onload = e => processXML(e.target.result);
+        r.readAsText(file, 'UTF-8');
+    }
+
+    // ── Bindings ──────────────────────────────────────────────────────────────
+    // Settings → realtime reprocess (debounced)
+    (() => {
+        let timer = null;
+        ['freqInput', 'gapInput', 'thresholdInput'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                clearTimeout(timer);
+                timer = setTimeout(() => { if (lastXmlText) processXML(lastXmlText); }, 300);
+            });
+        });
+    })();
+
+    // Table sort
+    document.querySelectorAll('thead th[data-col]').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.dataset.col;
+            if (sortCol === col) sortAsc = !sortAsc; else { sortCol = col; sortAsc = true; }
+            document.querySelectorAll('thead th').forEach(t => t.classList.remove('sort-asc', 'sort-desc'));
+            th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+            sortAndRender();
+        });
+    });
+    document.querySelector('thead th[data-col="group"]').classList.add('sort-asc');
+
+    // Drop zone / file input
+    const dropZone  = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault(); dropZone.classList.remove('drag-over');
+        if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); fileInput.value = ''; });
+    document.getElementById('browseBtn').addEventListener('click', () => fileInput.click());
+
+    document.getElementById('loadExampleBtn').addEventListener('click', async () => {
+        try {
+            const resp = await fetch('../../tools/peaklist.xml');
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            processXML(await resp.text());
+        } catch (e) {
+            alert('Could not load example: ' + e.message);
+        }
+    });
+
+    document.getElementById('downloadBtn').addEventListener('click', downloadCSV);
+
+    // Zoom buttons
+    document.getElementById('zoomIn').addEventListener('click',    () => Spectrum.zoom(0.6));
+    document.getElementById('zoomOut').addEventListener('click',   () => Spectrum.zoom(1.6));
+    document.getElementById('zoomReset').addEventListener('click', () => Spectrum.reset());
+
+    // Spectrum pan / pinch / wheel
+    (() => {
+        const container = document.getElementById('spectrumContainer');
+        const ptrs = new Map();
+        let lastPX = null, lastPD = null;
+
+        container.addEventListener('pointerdown', e => {
+            ptrs.set(e.pointerId, { x: e.clientX });
+            container.setPointerCapture(e.pointerId);
+            if (ptrs.size === 1) lastPX = e.clientX;
+        });
+        container.addEventListener('pointermove', e => {
+            if (!ptrs.has(e.pointerId)) return;
+            ptrs.set(e.pointerId, { x: e.clientX });
+            if (ptrs.size === 2) {
+                const [a, b] = [...ptrs.values()];
+                const dist = Math.abs(a.x - b.x);
+                if (lastPD !== null) Spectrum.zoom(lastPD / dist);
+                lastPD = dist; lastPX = null;
+            } else if (ptrs.size === 1 && lastPX !== null) {
+                const dx      = e.clientX - lastPX;
+                const ppmPerPx = (Spectrum.viewMax - Spectrum.viewMin) / container.getBoundingClientRect().width;
+                Spectrum.pan(dx * ppmPerPx);
+                lastPX = e.clientX;
+            }
+        });
+        const endP = e => {
+            ptrs.delete(e.pointerId);
+            if (ptrs.size < 2) lastPD = null;
+            if (ptrs.size === 0) lastPX = null;
+        };
+        container.addEventListener('pointerup',     endP);
+        container.addEventListener('pointercancel', endP);
+        container.addEventListener('wheel', e => {
+            e.preventDefault();
+            Spectrum.zoom(e.deltaY > 0 ? 1.15 : 0.87);
+        }, { passive: false });
+    })();
+
+    // Table hover → highlight; click → zoom
+    (() => {
+        const tbody = document.getElementById('resultsBody');
+        let timer = null;
+        tbody.addEventListener('mouseover', e => {
+            const tr = e.target.closest('tr[data-gid]');
+            if (!tr) return;
+            clearTimeout(timer);
+            Spectrum.setHighlight(parseInt(tr.dataset.gid));
+        });
+        tbody.addEventListener('mouseout', e => {
+            if (!e.relatedTarget || !e.relatedTarget.closest('tbody'))
+                timer = setTimeout(() => Spectrum.setHighlight(null), 80);
+        });
+        tbody.addEventListener('click', e => {
+            const tr = e.target.closest('tr[data-gid]');
+            if (tr) Spectrum.zoomToGroup(parseInt(tr.dataset.gid));
+        });
+    })();
+
+    // Theme
+    function applyTheme(t) {
+        document.documentElement.setAttribute('data-theme', t);
+        document.getElementById('themeToggle').innerHTML = t === 'dark' ? '&#9788;' : '&#9790;';
+        if (allGroupsFlat.length) Spectrum.render();
+    }
+    document.getElementById('themeToggle').addEventListener('click', () => {
+        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        applyTheme(next); localStorage.setItem('nmr-theme', next);
+    });
+    const savedTheme = localStorage.getItem('nmr-theme');
+    if (savedTheme) applyTheme(savedTheme);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches) applyTheme('dark');
+
+    // Init
+    Spectrum.init(document.getElementById('spectrumContainer'), document.getElementById('spectrumSvg'));
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>実験プロトコル フローチャート</title>
+  <style>
+    :root { --primary: #2563eb; --border: #e2e8f0; --bg: #f8fafc; --panel-w: 280px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: sans-serif;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px 12px;
+      background: white;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .tb-sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+    .tb-label { font-size: 11px; color: #94a3b8; letter-spacing: 0.04em; text-transform: uppercase; }
+    .tb-btn {
+      padding: 5px 11px; font-size: 13px;
+      border: 1px solid var(--border); border-radius: 5px;
+      background: white; cursor: pointer; color: #334155; white-space: nowrap;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .tb-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+    .tb-btn.active { background: #eff6ff; border-color: var(--primary); color: var(--primary); }
+    .tb-btn.danger { color: #dc2626; }
+    .tb-btn.danger:hover { background: #fef2f2; border-color: #fca5a5; }
+    #title-input {
+      border: none; outline: none; font-size: 13px; font-weight: 600;
+      color: #334155; background: transparent; width: 200px;
+      padding: 4px 6px; border-radius: 4px;
+    }
+    #title-input:focus { background: #f1f5f9; }
+
+    /* ── Main ── */
+    #main { display: flex; flex: 1; overflow: hidden; }
+
+    #canvas-container {
+      flex: 1; position: relative; overflow: hidden;
+      background-color: #f8f8f8;
+      background-image:
+        linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    #editor-svg { width: 100%; height: 100%; display: block; cursor: grab; }
+    #editor-svg.connect-mode { cursor: crosshair; }
+    #editor-svg.panning { cursor: grabbing; }
+
+    /* ── Panel ── */
+    #panel-container {
+      width: var(--panel-w); flex-shrink: 0;
+      background: white; border-left: 1px solid var(--border);
+      overflow-y: auto; padding: 14px;
+    }
+    .panel-empty { color: #94a3b8; font-size: 13px; margin-top: 20px; text-align: center; }
+
+    /* ── Status bar ── */
+    #statusbar {
+      font-size: 11px; color: #94a3b8;
+      padding: 3px 12px; background: white;
+      border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+  </style>
+
+  <!-- pptxgenjs CDN (global PptxGenJS) -->
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs/dist/pptxgen.bundle.js"></script>
+  <!-- Editor entry point -->
+  <script type="module" src="src/protocol_flowchart/ui/editor.js"></script>
+</head>
+<body>
+
+<div id="toolbar">
+  <input id="title-input" type="text" value="Protocol Flowchart" placeholder="タイトル">
+  <div class="tb-sep"></div>
+
+  <span class="tb-label">編集</span>
+  <button class="tb-btn" id="btn-add-node">＋ ノード追加</button>
+  <button class="tb-btn" id="btn-branch-up">↑ 分岐</button>
+  <button class="tb-btn" id="btn-branch-down">↓ 分岐</button>
+  <button class="tb-btn" id="btn-connect-mode">→ 接続</button>
+  <button class="tb-btn danger" id="btn-delete">削除</button>
+  <div class="tb-sep"></div>
+
+  <span class="tb-label">表示</span>
+  <button class="tb-btn" id="btn-relayout">整列リセット</button>
+  <button class="tb-btn active" id="btn-snap">スナップ</button>
+  <input id="snap-step" type="number" value="0.25" min="0.01" max="1" step="0.05"
+    title="スナップ刻み幅"
+    style="width:58px;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;color:#334155;">
+  <button class="tb-btn active" id="btn-grid-snap">グリッド</button>
+  <div class="tb-sep"></div>
+
+  <span class="tb-label">出力</span>
+  <button class="tb-btn" id="btn-export-svg">SVG保存</button>
+  <button class="tb-btn" id="btn-export-pptx">PPTX出力</button>
+  <button class="tb-btn" id="btn-save-json">JSON保存</button>
+  <button class="tb-btn" id="btn-load-json">JSON読込</button>
+  <input type="file" id="json-file-input" accept=".json" style="display:none">
+</div>
+
+<div id="main">
+  <div id="canvas-container">
+    <svg id="editor-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+  <div id="panel-container">
+    <p class="panel-empty">ノードまたはエッジを選択してください</p>
+  </div>
+</div>
+
+<div id="statusbar">ノード: 0 ／ エッジ: 0</div>
+
+</body>
+</html>

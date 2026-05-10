@@ -1,0 +1,20 @@
+[
+  {
+    "id": "tube_holder",
+    "name": "Connectable Sample Tube Holder",
+    "name_ja": "連結式サンプル管ホルダー",
+    "dir": "data/3dmodel/tube_holder"
+  },
+  {
+    "id": "tlc_holder",
+    "name": "TLC Plate Holder",
+    "name_ja": "TLCホルダー",
+    "dir": "data/3dmodel/tlc_holder"
+  },
+  {
+    "id": "capillary_guide",
+    "name": "Capillary Insertion Guide (18G)",
+    "name_ja": "キャピラリー挿入ガイド（18G）",
+    "dir": "data/3dmodel/capillary_guide"
+  }
+]

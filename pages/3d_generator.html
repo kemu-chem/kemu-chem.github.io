@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Model Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../main_style.css">
+    <link rel="stylesheet" href="../src/3d_generator.css">
+        <script type="importmap">
+                {
+                    "imports": {
+                        "@jscad/modeling": "https://cdn.jsdelivr.net/npm/@jscad/modeling@2/+esm",
+                        "@jscad/stl-serializer": "https://cdn.jsdelivr.net/npm/@jscad/stl-serializer@2/+esm"
+                    }
+                }
+        </script>
+</head>
+
+<body>
+    <div class="card tool-shell">
+        <a href="../index.html" class="portal-btn">&#8592; Portal</a>
+        <div class="tool-header">
+            <div>
+                <h1>3D Model Generator</h1>
+                <p class="subtitle">Parametric STL generator for lab accessories</p>
+            </div>
+        </div>
+
+        <section id="model-select" class="panel">
+            <h2>Select a model</h2>
+            <div id="model-grid" class="model-grid"></div>
+            <div id="model-error" class="error-box hidden"></div>
+        </section>
+
+        <section id="model-editor" class="panel hidden">
+            <div class="editor-layout">
+                <div class="viewer-card">
+                    <div class="viewer-toolbar">
+                        <div>
+                            <div class="viewer-title" id="model-title">Model</div>
+                            <div class="viewer-subtitle" id="model-subtitle"></div>
+                            <button id="back-to-select" class="ghost-btn back-btn" type="button">Back to model selection</button>
+                        </div>
+                        <button id="reset-view" class="ghost-btn" type="button">Reset view</button>
+                    </div>
+                    <div id="viewer" class="viewer" aria-label="3D viewer"></div>
+                    <div class="viewer-hint">Drag to orbit, Shift + drag to pan, scroll to zoom.</div>
+                </div>
+
+                <div class="param-card">
+                    <div class="param-header">
+                        <h3>Parameters</h3>
+                        <div class="param-status" id="param-status"></div>
+                    </div>
+                    <div id="param-list" class="param-list"></div>
+                </div>
+            </div>
+
+            <div class="bottom-bar">
+                <button id="download-stl" class="primary-btn" type="button" disabled>Download STL</button>
+            </div>
+            <div id="error-box" class="error-box hidden"></div>
+        </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@jscad/regl-renderer@2/dist/jscad-regl-renderer.min.js"></script>
+    <script type="module">
+        import(`../src/3d_generator.js?v=${Date.now()}`);
+    </script>
+</body>
+
+</html>
