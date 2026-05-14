@@ -1,7 +1,6 @@
 import { findNode } from '../core/graph.js';
 
-const PAD        = 14;   // Node shape padding
-const COIL_R     = 10;   // Coil arrow arc radius
+const COIL_R     = 16;   // Coil arrow arc radius
 const ANNOT_DIST = 40;   // px from edge to annotation box center
 
 // ── Public entry point ────────────────────────────────────────────────────────
@@ -9,18 +8,29 @@ const ANNOT_DIST = 40;   // px from edge to annotation box center
 export function renderSVG(graph, opts = {}) {
   const width  = opts.width  ?? 1200;
   const height = opts.height ?? 600;
+  const pad    = graph.meta?.nodePadding ?? 8;
 
   const fontFamily = graph.meta?.fontFamily ?? 'sans-serif';
 
+  const vx = opts.viewBoxX ?? 0;
+  const vy = opts.viewBoxY ?? 0;
+
   const parts = [];
-  parts.push(svgOpen(width, height));
+  parts.push(svgOpen(width, height, vx, vy));
   parts.push('<defs>');
-  // Fixed annotation arrow marker (small, always present)
-  parts.push('<marker id="annot-arrow" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto" markerUnits="userSpaceOnUse"><polygon points="0 0, 6 3, 0 6" fill="#555"/></marker>');
-  // Per-edge main arrow markers (size/color independent of stroke-width)
+  // Per-edge main arrow markers
   for (const edge of graph.edges) {
     const color = edge.arrowStyle.type === 'dashed' ? '#666' : '#333';
     parts.push(arrowMarkerDef(`arrow-${edge.id}`, color, edge.arrowStyle.headSize));
+    // Per-annotation arrow markers (color/size customisable)
+    for (const item of (edge.annotations?.items ?? [])) {
+      if (!(item.showArrow ?? true)) continue;
+      parts.push(arrowMarkerDef(
+        `annot-arrow-${item.id}`,
+        item.arrowColor ?? '#555555',
+        item.arrowHeadSize ?? 6,
+      ));
+    }
   }
   parts.push('</defs>');
 
@@ -28,11 +38,11 @@ export function renderSVG(graph, opts = {}) {
     const from = findNode(graph, edge.fromId);
     const to   = findNode(graph, edge.toId);
     if (!from || !to) continue;
-    parts.push(renderEdge(edge, from, to, `arrow-${edge.id}`, fontFamily));
+    parts.push(renderEdge(edge, from, to, `arrow-${edge.id}`, fontFamily, pad));
   }
 
   for (const node of graph.nodes) {
-    parts.push(renderNode(node, {}, fontFamily));
+    parts.push(renderNode(node, {}, fontFamily, pad));
   }
 
   parts.push('</svg>');
@@ -41,7 +51,7 @@ export function renderSVG(graph, opts = {}) {
 
 // ── Node rendering ────────────────────────────────────────────────────────────
 
-function renderNode(node, overrideStyle = {}, fontFamily = 'sans-serif') {
+function renderNode(node, overrideStyle = {}, fontFamily = 'sans-serif', pad = 8) {
   const style    = { ...node.style, ...overrideStyle };
   const labelStr = String(node.label || '');
   const { x, y, shape } = node;
@@ -57,41 +67,43 @@ function renderNode(node, overrideStyle = {}, fontFamily = 'sans-serif') {
   const lineH  = fs * 1.4;
   const textW  = Math.max(...lines.map(l => l.length)) * fs * 0.6;
   const textH  = lines.length * lineH;
-  const w      = textW + PAD * 2;
-  const h      = textH + PAD * 2;
+  const w      = textW + pad * 2;
+  const h      = textH + pad * 2;
   const fill   = style.fillColor ?? '#ffffff';
 
+  const fw = style.fontWeight ?? 'normal';
+  const fi = style.fontStyle  ?? 'normal';
   const textEl = lines.map((l, i) =>
-    `<tspan x="${x}" dy="${i === 0 ? -(lines.length - 1) * lineH / 2 : lineH}">${esc(l)}</tspan>`
+    `<tspan x="${x}" dy="${i === 0 ? -(lines.length - 1) * lineH / 2 + fs * 0.35 : lineH}">${esc(l)}</tspan>`
   ).join('');
-  const label = `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${fs}" fill="${stroke}" font-family="${fontFamily}">${textEl}</text>`;
+  const label = `<text x="${x}" y="${y}" text-anchor="middle" font-size="${fs}" font-weight="${fw}" font-style="${fi}" fill="${stroke}" font-family="${fontFamily}">${textEl}</text>`;
 
   if (shape === 'none') return label;
 
   let shapeEl = '';
   if (shape === 'box') {
-    shapeEl = `<rect x="${x - w/2}" y="${y - h/2}" width="${w}" height="${h}" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+    shapeEl = `<rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
   } else if (shape === 'circle') {
     const r = Math.max(w, h) / 2;
     shapeEl = `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${r}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
   } else if (shape === 'diamond') {
     const hw = w / 2, hh = h / 2;
-    shapeEl = `<polygon points="${x},${y-hh} ${x+hw},${y} ${x},${y+hh} ${x-hw},${y}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+    shapeEl = `<polygon points="${x},${y - hh} ${x + hw},${y} ${x},${y + hh} ${x - hw},${y}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
   }
   return shapeEl + '\n' + label;
 }
 
 // ── Edge rendering ────────────────────────────────────────────────────────────
 
-function renderEdge(edge, from, to, markerId, fontFamily = 'sans-serif') {
+function renderEdge(edge, from, to, markerId, fontFamily = 'sans-serif', pad = 8) {
   const parts = [];
   const { thickness, headSize, type } = edge.arrowStyle;
   const dashed = type === 'dashed' ? `stroke-dasharray="${headSize * 1.5} ${headSize}"` : '';
   const color  = type === 'dashed' ? '#666' : '#333';
 
   const path = edge.routing === 'orthogonal'
-    ? orthogonalPath(from, to)
-    : diagonalPath(from, to);
+    ? orthogonalPath(from, to, pad)
+    : diagonalPath(from, to, pad);
 
   parts.push(`<path d="${path}" fill="none" stroke="${color}" stroke-width="${thickness}" ${dashed} marker-end="url(#${markerId})"/>`);
 
@@ -104,14 +116,14 @@ function renderEdge(edge, from, to, markerId, fontFamily = 'sans-serif') {
     const thickness = cs.thickness ?? 1.5;
     const headSize  = cs.headSize  ?? 5;
     const gap       = cs.gap       ?? 12;
-    const pt = pointOnPath(edge, from, to, t);
+    const pt = pointOnPath(edge, from, to, t, pad);
     const pd = perpDir(pt.tx, pt.ty, side);
     parts.push(coilArrow(pt.x + pd.x * (r + gap), pt.y + pd.y * (r + gap), r, thickness, headSize));
   }
 
   // Perpendicular annotation items
   for (const item of (edge.annotations.items ?? [])) {
-    parts.push(renderAnnotationItem(item, edge, from, to, fontFamily));
+    parts.push(renderAnnotationItem(item, edge, from, to, fontFamily, pad));
   }
 
   return parts.join('\n');
@@ -119,8 +131,8 @@ function renderEdge(edge, from, to, markerId, fontFamily = 'sans-serif') {
 
 // ── Annotation item rendering ─────────────────────────────────────────────────
 
-function renderAnnotationItem(item, edge, from, to, fontFamily = 'sans-serif') {
-  const edgePt = pointOnPath(edge, from, to, item.t ?? 0.5);
+function renderAnnotationItem(item, edge, from, to, fontFamily = 'sans-serif', pad = 8) {
+  const edgePt = pointOnPath(edge, from, to, item.t ?? 0.5, pad);
   const pd     = perpDir(edgePt.tx, edgePt.ty, item.side ?? 'above');
   const dist = item.dist ?? ANNOT_DIST;
   const cx   = edgePt.x + pd.x * dist;
@@ -129,42 +141,45 @@ function renderAnnotationItem(item, edge, from, to, fontFamily = 'sans-serif') {
   const proxy = {
     label: item.label || ' ',
     shape: item.shape ?? 'none',
-    style: { borderColor: '#444', fillColor: '#f8f8f8', fontSize: 12 },
+    style: { borderColor: '#444', fillColor: '#f8f8f8', fontSize: item.fontSize ?? 12, fontWeight: item.fontWeight ?? 'normal', fontStyle: item.fontStyle ?? 'normal' },
     x: cx, y: cy,
   };
 
-  const showArrow = item.showArrow ?? true;
-  const arrowGap  = item.arrowGap  ?? 2;
+  const showArrow      = item.showArrow      ?? true;
+  const arrowGap       = item.arrowGap       ?? 2;
+  const arrowColor     = item.arrowColor     ?? '#555555';
+  const arrowThickness = item.arrowThickness ?? 1.5;
   const arrowLine = showArrow
     ? (() => {
-        const bp  = borderPoint(proxy, edgePt.x, edgePt.y);
-        const len = Math.hypot(edgePt.x - bp.x, edgePt.y - bp.y);
-        const nx  = len > 0 ? (edgePt.x - bp.x) / len : 0;
-        const ny  = len > 0 ? (edgePt.y - bp.y) / len : 0;
-        const x1  = bp.x + arrowGap * nx;
-        const y1  = bp.y + arrowGap * ny;
-        return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${edgePt.x.toFixed(1)}" y2="${edgePt.y.toFixed(1)}" stroke="#555" stroke-width="1.5" marker-end="url(#annot-arrow)"/>`;
-      })()
+      const bp  = borderPoint(proxy, edgePt.x, edgePt.y, pad);
+      const len = Math.hypot(edgePt.x - bp.x, edgePt.y - bp.y);
+      const nx  = len > 0 ? (edgePt.x - bp.x) / len : 0;
+      const ny  = len > 0 ? (edgePt.y - bp.y) / len : 0;
+      const x1  = bp.x + arrowGap * nx;
+      const y1  = bp.y + arrowGap * ny;
+      return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${edgePt.x.toFixed(1)}" y2="${edgePt.y.toFixed(1)}" stroke="${arrowColor}" stroke-width="${arrowThickness}" marker-end="url(#annot-arrow-${item.id})"/>`;
+    })()
     : '';
 
-  const content = renderNode(proxy, {}, fontFamily) + (arrowLine ? '\n' + arrowLine : '');
-  return `<g data-id="${item.id}" data-type="annot" data-edge-id="${edge.id}" style="cursor:pointer">\n${content}\n</g>`;
+  const content = renderNode(proxy, {}, fontFamily, pad) + (arrowLine ? '\n' + arrowLine : '');
+  // pointer-events="all" overrides the parent <g pointer-events="none"> so annotations are clickable
+  return `<g data-id="${item.id}" data-type="annot" data-edge-id="${edge.id}" style="cursor:pointer" pointer-events="all">\n${content}\n</g>`;
 }
 
 // ── Path position & geometry ──────────────────────────────────────────────────
 
 // Returns { x, y, tx, ty } — position and unnormalized tangent at t ∈ [0,1].
-function pointOnPath(edge, from, to, t) {
+function pointOnPath(edge, from, to, t, pad = 8) {
   if (edge.routing === 'diagonal') {
-    const s  = borderPoint(from, to.x, to.y);
-    const e  = borderPoint(to, from.x, from.y);
+    const s  = borderPoint(from, to.x, to.y, pad);
+    const e  = borderPoint(to, from.x, from.y, pad);
     const tx = e.x - s.x, ty = e.y - s.y;
     return { x: s.x + t * tx, y: s.y + t * ty, tx, ty };
   }
 
   // orthogonal: 3 segments M sx sy H midX V ey H ex
-  const s    = borderPoint(from, to.x, from.y);
-  const e    = borderPoint(to, s.x, to.y);
+  const s    = borderPoint(from, to.x, from.y, pad);
+  const e    = borderPoint(to, s.x, to.y, pad);
   const midX = (s.x + e.x) / 2;
   const segs = [
     { x0: s.x,  y0: s.y,  x1: midX, y1: s.y,  tx: midX - s.x, ty: 0 },
@@ -201,19 +216,19 @@ function perpDir(tx, ty, side) {
 
 // ── Node geometry helpers ─────────────────────────────────────────────────────
 
-function nodeDims(node) {
+function nodeDims(node, pad = 8) {
   const labelStr = String(node.label || '');
   if (!labelStr.trim()) return { w: 0, h: 0 };
   const lines = labelStr.split('\n');
   const fs    = node.style?.fontSize ?? 14;
-  const w     = Math.max(...lines.map(l => l.length)) * fs * 0.6 + PAD * 2;
-  const h     = lines.length * fs * 1.4 + PAD * 2;
+  const w     = Math.max(...lines.map(l => l.length)) * fs * 0.6 + pad * 2;
+  const h     = lines.length * fs * 1.4 + pad * 2;
   return { w, h };
 }
 
-export function borderPoint(node, tx, ty) {
+export function borderPoint(node, tx, ty, pad = 8) {
   const { x, y, shape } = node;
-  const { w, h } = nodeDims(node);
+  const { w, h } = nodeDims(node, pad);
   const dx = tx - x, dy = ty - y;
   if (dx === 0 && dy === 0) return { x, y };
   if (w === 0 && h === 0) return { x, y };
@@ -239,16 +254,16 @@ export function borderPoint(node, tx, ty) {
 
 // ── Path generators ───────────────────────────────────────────────────────────
 
-function orthogonalPath(from, to) {
-  const s = borderPoint(from, to.x, from.y);
-  const e = borderPoint(to, s.x, to.y);
+function orthogonalPath(from, to, pad = 8) {
+  const s = borderPoint(from, to.x, from.y, pad);
+  const e = borderPoint(to, s.x, to.y, pad);
   const m = (s.x + e.x) / 2;
   return `M ${s.x} ${s.y} H ${m} V ${e.y} H ${e.x}`;
 }
 
-function diagonalPath(from, to) {
-  const s = borderPoint(from, to.x, to.y);
-  const e = borderPoint(to, from.x, from.y);
+function diagonalPath(from, to, pad = 8) {
+  const s = borderPoint(from, to.x, to.y, pad);
+  const e = borderPoint(to, from.x, from.y, pad);
   return `M ${s.x} ${s.y} L ${e.x} ${e.y}`;
 }
 
@@ -271,11 +286,11 @@ function coilArrow(cx, cy, r, thickness, headSize) {
 // ── Misc helpers ──────────────────────────────────────────────────────────────
 
 function arrowMarkerDef(id, color, size) {
-  return `<marker id="${id}" markerWidth="${size}" markerHeight="${size}" refX="${size}" refY="${size/2}" orient="auto" markerUnits="userSpaceOnUse"><polygon points="0 0, ${size} ${size/2}, 0 ${size}" fill="${color}"/></marker>`;
+  return `<marker id="${id}" markerWidth="${size}" markerHeight="${size}" refX="${size}" refY="${size / 2}" orient="auto" markerUnits="userSpaceOnUse"><polygon points="0 0, ${size} ${size / 2}, 0 ${size}" fill="${color}"/></marker>`;
 }
 
-function svgOpen(w, h) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
+function svgOpen(w, h, vx = 0, vy = 0) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${vx} ${vy} ${w} ${h}">`;
 }
 
 function esc(str) {
@@ -284,10 +299,57 @@ function esc(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// ── Bounding box ──────────────────────────────────────────────────────────────
+
+function computeBoundingBox(graph, margin = 24) {
+  const pad = graph.meta?.nodePadding ?? 8;
+
+  if (graph.nodes.length === 0) return { x: 0, y: 0, w: 800, h: 400 };
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+  const expand = (cx, cy, hw, hh) => {
+    minX = Math.min(minX, cx - hw);
+    minY = Math.min(minY, cy - hh);
+    maxX = Math.max(maxX, cx + hw);
+    maxY = Math.max(maxY, cy + hh);
+  };
+
+  for (const node of graph.nodes) {
+    const { w, h } = nodeDims(node, pad);
+    expand(node.x, node.y, Math.max(w, 24) / 2, Math.max(h, 24) / 2);
+  }
+
+  for (const edge of graph.edges) {
+    const from = findNode(graph, edge.fromId);
+    const to   = findNode(graph, edge.toId);
+    if (!from || !to) continue;
+    for (const item of (edge.annotations.items ?? [])) {
+      if (!item.label?.trim()) continue;
+      const pt  = pointOnPath(edge, from, to, item.t ?? 0.5, pad);
+      const pd  = perpDir(pt.tx, pt.ty, item.side ?? 'above');
+      const cx  = pt.x + pd.x * (item.dist ?? ANNOT_DIST);
+      const cy  = pt.y + pd.y * (item.dist ?? ANNOT_DIST);
+      const { w, h } = nodeDims(
+        { label: item.label, shape: item.shape ?? 'none', style: { fontSize: item.fontSize ?? 12 } }, pad
+      );
+      expand(cx, cy, Math.max(w, 10) / 2, Math.max(h, 10) / 2);
+    }
+  }
+
+  return {
+    x: minX - margin,
+    y: minY - margin,
+    w: Math.ceil(maxX - minX + margin * 2),
+    h: Math.ceil(maxY - minY + margin * 2),
+  };
+}
+
 // ── SVG download ──────────────────────────────────────────────────────────────
 
-export function downloadSVG(graph, opts = {}) {
-  const svg  = renderSVG(graph, opts);
+export function downloadSVG(graph) {
+  const bb   = computeBoundingBox(graph);
+  const svg  = renderSVG(graph, { width: bb.w, height: bb.h, viewBoxX: bb.x, viewBoxY: bb.y });
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');

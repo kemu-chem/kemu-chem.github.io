@@ -11,6 +11,7 @@ export function createGraph(meta = {}) {
       cellW: meta.cellW ?? 180,
       cellH: meta.cellH ?? 100,
       fontFamily: meta.fontFamily ?? 'sans-serif',
+      nodePadding: meta.nodePadding ?? 8,
     },
   };
 }
@@ -26,6 +27,8 @@ export function addNode(graph, props = {}) {
       borderColor: props.style?.borderColor ?? '#333333',
       fillColor:   props.style?.fillColor   ?? '#ffffff',
       fontSize:    props.style?.fontSize    ?? 14,
+      fontWeight:  props.style?.fontWeight  ?? 'normal',
+      fontStyle:   props.style?.fontStyle   ?? 'normal',
     },
     x: props.x ?? 0,
     y: props.y ?? 0,
@@ -173,6 +176,25 @@ export function edgesFrom(graph, nodeId) {
 
 export function edgesTo(graph, nodeId) {
   return graph.edges.filter(e => e.toId === nodeId);
+}
+
+// Returns all nodeIds and edgeIds in the weakly connected component containing startNodeId.
+export function getComponent(graph, startNodeId) {
+  const nodeIds = new Set();
+  const edgeIds = new Set();
+  const queue   = [startNodeId];
+  while (queue.length) {
+    const id = queue.shift();
+    if (nodeIds.has(id)) continue;
+    nodeIds.add(id);
+    for (const e of graph.edges) {
+      if (e.fromId !== id && e.toId !== id) continue;
+      edgeIds.add(e.id);
+      const neighbor = e.fromId === id ? e.toId : e.fromId;
+      if (!nodeIds.has(neighbor)) queue.push(neighbor);
+    }
+  }
+  return { nodeIds, edgeIds };
 }
 
 // ── Serialization ─────────────────────────────────────────────────────────────

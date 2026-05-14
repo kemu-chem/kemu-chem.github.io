@@ -1,7 +1,7 @@
 import {
   createGraph, addNode, addEdge, removeNode, removeEdge,
   updateNode, updateEdge, findNode, findEdge,
-  toJSON, fromJSON,
+  toJSON, fromJSON, getComponent,
 } from '../core/graph.js';
 import { applyLayout } from '../core/layout.js';
 import { renderSVG, downloadSVG, borderPoint } from '../renderers/svg.js';
@@ -20,6 +20,7 @@ let dragState         = null;         // { startX, startY, dragIds, origPosition
 let panState          = null;
 let viewOffset        = { x: 0, y: 0 };
 let clickBlocked      = false;
+let lastDragMoved     = false;
 let snapMode          = true;
 let snapStep          = 0.25;
 let gridSnap          = true;
@@ -32,14 +33,59 @@ const titleInput   = document.getElementById('title-input');
 const jsonFileInput= document.getElementById('json-file-input');
 const snapStepInput= document.getElementById('snap-step');
 const gridSizeInput= document.getElementById('grid-size');
+const padInput     = document.getElementById('pad-input');
 const fontSelect   = document.getElementById('font-select');
-const inlineEdit   = document.getElementById('inline-edit');
+const inlineEdit    = document.getElementById('inline-edit');
+const inlineToolbar = document.getElementById('inline-toolbar');
 
 let inlineEditNodeId = null;
+let inlineEditAnnot  = null;  // { id, edgeId } while editing an annotation inline
+
+// ── Undo / Redo ───────────────────────────────────────────────────────────────
+
+const HISTORY_MAX = 30;
+const history = [];
+const future  = [];
+
+function pushHistory() {
+  const snap = toJSON(graph);
+  if (history.length > 0 && history[history.length - 1] === snap) return;
+  history.push(snap);
+  if (history.length > HISTORY_MAX) history.shift();
+  future.length = 0;
+}
+
+function syncMetaUI() {
+  titleInput.value = graph.meta.title || '';
+  fontSelect.value = graph.meta.fontFamily ?? 'sans-serif';
+  if (padInput) padInput.value = graph.meta.nodePadding ?? 8;
+}
+
+function undo() {
+  if (history.length === 0) return;
+  future.push(toJSON(graph));
+  graph = fromJSON(history.pop());
+  clearAllSelections();
+  syncMetaUI();
+  redraw();
+}
+
+function redo() {
+  if (future.length === 0) return;
+  history.push(toJSON(graph));
+  graph = fromJSON(future.pop());
+  clearAllSelections();
+  syncMetaUI();
+  redraw();
+}
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
+document.getElementById('btn-undo').addEventListener('click', undo);
+document.getElementById('btn-redo').addEventListener('click', redo);
+
 document.getElementById('btn-add-node').addEventListener('click', () => {
+  pushHistory();
   const focused = selectedNode();
   const edge    = selectedEdge();
 
@@ -72,6 +118,7 @@ document.getElementById('btn-add-node').addEventListener('click', () => {
 document.getElementById('btn-branch-up').addEventListener('click', () => {
   const focused = selectedNode();
   if (!focused) return;
+  pushHistory();
   const node = addNode(graph, { x: focused.x + graph.meta.cellW, y: focused.y - graph.meta.cellH });
   tryAddEdge(focused.id, node.id);
   clearAllSelections();
@@ -82,6 +129,7 @@ document.getElementById('btn-branch-up').addEventListener('click', () => {
 document.getElementById('btn-branch-down').addEventListener('click', () => {
   const focused = selectedNode();
   if (!focused) return;
+  pushHistory();
   const node = addNode(graph, { x: focused.x + graph.meta.cellW, y: focused.y + graph.meta.cellH });
   tryAddEdge(focused.id, node.id);
   clearAllSelections();
@@ -95,6 +143,7 @@ document.getElementById('btn-connect-mode').addEventListener('click', () => {
     statusbar.textContent = 'Select at least 2 nodes to connect';
     return;
   }
+  pushHistory();
   const [sourceId, ...targetIds] = ids;
   for (const targetId of targetIds) tryAddEdge(sourceId, targetId);
   redraw();
@@ -114,6 +163,12 @@ document.getElementById('btn-select-all-edges').addEventListener('click', () => 
   graph.edges.forEach(e => edgeMultiSel.add(e.id));
   setSelection(null);
   redraw();
+});
+
+document.getElementById('btn-select-component').addEventListener('click', () => {
+  const node = selectedNode();
+  if (!node) { statusbar.textContent = 'Select a node first'; return; }
+  selectComponent(node.id);
 });
 
 document.getElementById('btn-delete').addEventListener('click', doDelete);
@@ -139,13 +194,19 @@ gridSizeInput.addEventListener('input', () => {
   if (v > 0) gridSize = v;
 });
 
+if (padInput) padInput.addEventListener('input', () => {
+  const v = Number(padInput.value);
+  if (v >= 0) { graph.meta.nodePadding = v; redraw(); }
+});
+
 document.getElementById('btn-relayout').addEventListener('click', () => {
+  pushHistory();
   applyLayout(graph, { forceAll: true });
   redraw();
 });
 
 document.getElementById('btn-export-svg').addEventListener('click', () => {
-  downloadSVG(graph, { width: svgWidth(), height: svgHeight() });
+  downloadSVG(graph);
 });
 
 document.getElementById('btn-export-pptx').addEventListener('click', async () => {
@@ -175,7 +236,10 @@ jsonFileInput.addEventListener('change', () => {
       graph = fromJSON(e.target.result);
       titleInput.value = graph.meta.title || '';
       fontSelect.value = graph.meta.fontFamily ?? 'sans-serif';
+      if (padInput) padInput.value = graph.meta.nodePadding ?? 8;
       viewOffset = { x: 0, y: 0 };
+      history.length = 0;
+      future.length  = 0;
       clearAllSelections();
       redraw();
     } catch (err) {
@@ -197,10 +261,11 @@ document.addEventListener('keydown', (e) => {
   if (document.activeElement.tagName === 'INPUT' ||
       document.activeElement.tagName === 'TEXTAREA') return;
   if (e.key === 'Delete' || e.key === 'Backspace') doDelete();
-  if (e.key === 'Escape') {
-    clearAllSelections();
-    redraw();
-  }
+  if (e.key === 'Escape') { clearAllSelections(); redraw(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleFontProp('fontWeight', 'bold', 'normal'); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') { e.preventDefault(); toggleFontProp('fontStyle', 'italic', 'normal'); }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
 });
 
 // ── SVG interaction ───────────────────────────────────────────────────────────
@@ -214,6 +279,7 @@ svg.addEventListener('click', (e) => {
     const { action, nodeId } = actionEl.dataset;
     const node = findNode(graph, nodeId);
     if (!node) return;
+    pushHistory();
     let newNode;
     if (action === 'extend') {
       newNode = addNode(graph, { x: node.x + graph.meta.cellW, y: node.y });
@@ -239,9 +305,23 @@ svg.addEventListener('click', (e) => {
 
   // Annotation click
   if (type === 'annot') {
+    const edgeId = target.dataset.edgeId;
+    const wasDragged = lastDragMoved;
+    lastDragMoved = false;
+    if (!wasDragged && selection?.type === 'annot' && selection.id === id) {
+      const edge = findEdge(graph, edgeId);
+      const item = edge?.annotations?.items?.find(it => it.id === id);
+      if (item) { showInlineEditAnnot(item, edgeId, e); return; }
+    }
     clearAllSelections();
-    setSelection({ type: 'annot', id, edgeId: target.dataset.edgeId });
+    setSelection({ type: 'annot', id, edgeId });
     redraw();
+    return;
+  }
+
+  // Alt+click on node → select its weakly connected component
+  if (type === 'node' && e.altKey) {
+    selectComponent(id);
     return;
   }
 
@@ -279,6 +359,14 @@ svg.addEventListener('click', (e) => {
     return;
   }
 
+  // Click on already-selected node (without drag) → open inline editor
+  if (type === 'node' && !lastDragMoved && selection?.type === 'node' && selection.id === id) {
+    lastDragMoved = false;
+    const node = findNode(graph, id);
+    if (node) { showInlineEdit(node); return; }
+  }
+  lastDragMoved = false;
+
   // Regular click
   clearAllSelections();
   setSelection({ type, id });
@@ -292,6 +380,7 @@ svg.addEventListener('mousedown', (e) => {
     const nodeId = nodeTarget.dataset.id;
     const node   = findNode(graph, nodeId);
     if (!node) return;
+    pushHistory();
     const pt = svgPoint(e);
 
     const dragIds = multiSelection.size >= 2 && multiSelection.has(nodeId)
@@ -303,7 +392,8 @@ svg.addEventListener('mousedown', (e) => {
     );
     dragState = { startX: pt.x, startY: pt.y, dragIds, origPositions };
     hoveredNodeId = null;
-    e.preventDefault();
+    // Do NOT call e.preventDefault() here — it suppresses dblclick in some browsers.
+    // Text selection is already prevented by `user-select: none` on the SVG element.
   } else if (!e.target.closest('[data-id]')) {
     panState = { startX: e.clientX, startY: e.clientY, origX: viewOffset.x, origY: viewOffset.y, moved: false };
     svg.classList.add('panning');
@@ -316,6 +406,7 @@ svg.addEventListener('mousemove', (e) => {
     const pt = svgPoint(e);
     const dx = pt.x - dragState.startX;
     const dy = pt.y - dragState.startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragState.moved = true;
     for (const id of dragState.dragIds) {
       const orig = dragState.origPositions.get(id);
       if (!orig) continue;
@@ -334,6 +425,7 @@ svg.addEventListener('mousemove', (e) => {
 });
 
 svg.addEventListener('mouseup', () => {
+  lastDragMoved = dragState?.moved ?? false;
   if (panState?.moved) {
     clickBlocked = true;
     setTimeout(() => { clickBlocked = false; }, 0);
@@ -343,23 +435,49 @@ svg.addEventListener('mouseup', () => {
   svg.classList.remove('panning');
 });
 
-svg.addEventListener('dblclick', (e) => {
-  const nodeEl = e.target.closest('[data-type="node"]');
-  if (!nodeEl) return;
-  const node = findNode(graph, nodeEl.dataset.id);
-  if (!node) return;
-  e.preventDefault();
-  clearAllSelections();
-  setSelection({ type: 'node', id: node.id });
-  showInlineEdit(node);
-});
 
 inlineEdit.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { e.stopPropagation(); hideInlineEdit(false); }
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); hideInlineEdit(true); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+    e.preventDefault();
+    applyInlineFontProp('fontWeight', 'bold', 'normal');
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+    e.preventDefault();
+    applyInlineFontProp('fontStyle', 'italic', 'normal');
+  }
 });
 
 inlineEdit.addEventListener('blur', () => hideInlineEdit(true));
+
+// ── Inline script buttons ─────────────────────────────────────────────────────
+
+const _SUB_CPS = [0x2080,0x2081,0x2082,0x2083,0x2084,0x2085,0x2086,0x2087,0x2088,0x2089,0x208A,0x208B];
+const _SUP_CPS = [0x2070,0x00B9,0x00B2,0x00B3,0x2074,0x2075,0x2076,0x2077,0x2078,0x2079,0x207A,0x207B];
+const _KEYS    = '0123456789+-'.split('');
+const _chr     = cp => String.fromCodePoint(cp);
+const SCRIPT_SUB = Object.fromEntries([
+  ..._KEYS.map((k, i) => [k,           _chr(_SUB_CPS[i])]),
+  ..._SUP_CPS.map((cp, i) => [_chr(cp), _chr(_SUB_CPS[i])]),
+]);
+const SCRIPT_SUP = Object.fromEntries([
+  ..._KEYS.map((k, i) => [k,           _chr(_SUP_CPS[i])]),
+  ..._SUB_CPS.map((cp, i) => [_chr(cp), _chr(_SUP_CPS[i])]),
+]);
+
+function applyScriptInline(map) {
+  const s = inlineEdit.selectionStart, e = inlineEdit.selectionEnd;
+  if (s === e) return;
+  const val  = inlineEdit.value;
+  const conv = [...val.slice(s, e)].map(c => map[c] ?? c).join('');
+  inlineEdit.value = val.slice(0, s) + conv + val.slice(e);
+  inlineEdit.setSelectionRange(s, s + conv.length);
+  inlineEdit.focus();
+}
+
+document.getElementById('itb-sub')?.addEventListener('mousedown', e => { e.preventDefault(); applyScriptInline(SCRIPT_SUB); });
+document.getElementById('itb-sup')?.addEventListener('mousedown', e => { e.preventDefault(); applyScriptInline(SCRIPT_SUP); });
 
 svg.addEventListener('mouseover', (e) => {
   if (dragState || panState) return;
@@ -382,12 +500,10 @@ svg.addEventListener('mouseleave', () => {
 svg.addEventListener('wheel', (e) => {
   e.preventDefault();
   if (e.ctrlKey || e.metaKey) {
-    // Ctrl+wheel or trackpad pinch → pan
-    viewOffset.x -= e.deltaX / zoom;
-    viewOffset.y -= e.deltaY / zoom;
-  } else {
-    // Plain wheel or trackpad scroll → zoom toward cursor
-    const factor  = Math.pow(0.999, e.deltaY);
+    // Pinch gesture (trackpad) or Ctrl+wheel (mouse) → zoom toward cursor
+    // Clamp delta so mouse wheel (deltaY≈100) doesn't jump; trackpad pinch (deltaY≈3) is more responsive
+    const clampedDelta = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 25);
+    const factor  = Math.pow(0.99, clampedDelta);
     const newZoom = Math.min(8, Math.max(0.1, zoom * factor));
     const rect = svg.getBoundingClientRect();
     const px = e.clientX - rect.left;
@@ -395,6 +511,10 @@ svg.addEventListener('wheel', (e) => {
     viewOffset.x += px * (1 / newZoom - 1 / zoom);
     viewOffset.y += py * (1 / newZoom - 1 / zoom);
     zoom = newZoom;
+  } else {
+    // Two-finger scroll (trackpad) or plain wheel (mouse) → pan
+    viewOffset.x -= e.deltaX / zoom;
+    viewOffset.y -= e.deltaY / zoom;
   }
   redrawQuiet();
 }, { passive: false });
@@ -405,32 +525,99 @@ function redraw() {
   redrawQuiet();
   const sel   = getSelectionData();
   const tStep = snapMode ? snapStep : 0.01;
+  let panelHistoryPushed = false;  // push history once per panel-session
 
   renderPanel(sel, (id, props) => {
+    if (!panelHistoryPushed) { pushHistory(); panelHistoryPushed = true; }
+
+    // fontWeight/fontStyle changes need full redraw so panel B/I buttons update visually
+    const hasFontStyleChange = (p) =>
+      p?.style?.fontWeight !== undefined || p?.style?.fontStyle !== undefined ||
+      p?.fontWeight !== undefined || p?.fontStyle !== undefined ||
+      p?._annotStyle?.fontWeight !== undefined || p?._annotStyle?.fontStyle !== undefined;
+
     // Multi-node or multi-edge batch update
     if (Array.isArray(id)) {
       if (sel.type === 'multi') {
-        for (const nid of id) updateNode(graph, nid, props);
+        const { _scalePositions, ...nodeProps } = props;
+        const fsOld = _scalePositions ? avgFontSize() : 0;
+        for (const nid of id) updateNode(graph, nid, nodeProps);
+        if (_scalePositions) scaleNodePositions(avgFontSize() / fsOld);
+      } else if (props._annotNormalize) {
+        const { edgeGap } = props._annotNormalize;
+        const pad = graph.meta?.nodePadding ?? 8;
+        for (const eid of id) {
+          const edge = findEdge(graph, eid);
+          if (!edge) continue;
+          const items = edge.annotations.items.map(it => ({ ...it, dist: computeAnnotDist(it, edgeGap, pad) }));
+          updateEdge(graph, eid, { annotations: { items } });
+        }
+      } else if (props._annotStyle) {
+        // Bulk-update all annotation items in selected edges
+        const { _annotStyle } = props;
+        const autoScale = document.querySelector('#panel-container input[name="annot-auto-scale"]')?.checked;
+        let positionFactor = 1;
+        if (autoScale && _annotStyle.fontSize !== undefined) {
+          const allItems = id.flatMap(eid => findEdge(graph, eid)?.annotations?.items ?? []);
+          const avgOldFs = allItems.length > 0
+            ? allItems.reduce((s, it) => s + (it.fontSize ?? 12), 0) / allItems.length : 12;
+          positionFactor = avgOldFs > 0 ? _annotStyle.fontSize / avgOldFs : 1;
+        }
+        for (const eid of id) {
+          const edge = findEdge(graph, eid);
+          if (!edge) continue;
+          const items = edge.annotations.items.map(it => ({ ...it, ..._annotStyle }));
+          updateEdge(graph, eid, { annotations: { items } });
+        }
+        if (isFinite(positionFactor) && Math.abs(positionFactor - 1) > 0.001) scaleNodePositions(positionFactor);
       } else {
         for (const eid of id) updateEdge(graph, eid, props);
       }
-      redrawQuiet();
+      (hasFontStyleChange(props) || props._scalePositions) ? redraw() : redrawQuiet();
       return;
     }
 
     if (selection?.type === 'node') {
       updateNode(graph, id, props);
-      redrawQuiet();
+      hasFontStyleChange(props) ? redraw() : redrawQuiet();
     } else if (selection?.type === 'annot') {
       // id = itemId, props = item patch
       const edge = findEdge(graph, selection.edgeId);
       if (!edge) return;
+      const autoScale = document.querySelector('#panel-container input[name="annot-auto-scale"]')?.checked;
+      let positionFactor = 1;
+      if (autoScale && props.fontSize !== undefined) {
+        const currentItem = edge.annotations.items.find(it => it.id === id);
+        const oldFs = currentItem?.fontSize ?? 12;
+        positionFactor = oldFs > 0 ? props.fontSize / oldFs : 1;
+      }
       const items = edge.annotations.items.map(it => it.id === id ? { ...it, ...props } : it);
       updateEdge(graph, edge.id, { annotations: { items } });
-      // Re-render panel when snap changes to update slider step
-      if (props.snap !== undefined) redraw();
+      if (isFinite(positionFactor) && Math.abs(positionFactor - 1) > 0.001) scaleNodePositions(positionFactor);
+      // Re-render panel when snap or font style changes to update controls visually
+      if (props.snap !== undefined || hasFontStyleChange(props)) redraw();
       else redrawQuiet();
     } else {
+      if (props._annotNormalize) {
+        const { edgeGap } = props._annotNormalize;
+        const pad = graph.meta?.nodePadding ?? 8;
+        const edge = findEdge(graph, id);
+        if (edge) {
+          const items = edge.annotations.items.map(it => ({ ...it, dist: computeAnnotDist(it, edgeGap, pad) }));
+          updateEdge(graph, edge.id, { annotations: { items } });
+        }
+        redrawQuiet();
+        return;
+      }
+      if (props._annotStyle) {
+        const edge = findEdge(graph, id);
+        if (edge) {
+          const items = edge.annotations.items.map(it => ({ ...it, ...props._annotStyle }));
+          updateEdge(graph, edge.id, { annotations: { items } });
+        }
+        hasFontStyleChange(props) ? redraw() : redrawQuiet();
+        return;
+      }
       const edge      = findEdge(graph, id);
       const prevLen   = edge?.annotations?.items?.length ?? 0;
       const prevCoil  = edge?.annotations?.coil;
@@ -461,6 +648,7 @@ function buildSVG(w, h) {
 
   const overlays = [];
 
+  const nodePad = graph.meta.nodePadding ?? 8;
   for (const node of graph.nodes) {
     const isSelected = (selection?.type === 'node' && selection.id === node.id) ||
                        multiSelection.has(node.id);
@@ -471,8 +659,8 @@ function buildSVG(w, h) {
     const isEmpty  = !labelStr.trim();
     const lines = isEmpty ? [] : labelStr.split('\n');
     const fs    = node.style?.fontSize ?? 14;
-    const hw    = isEmpty ? 8 : Math.max(...lines.map(l => l.length)) * fs * 0.3 + 14;
-    const hh    = isEmpty ? 8 : lines.length * fs * 0.7 + 14;
+    const hw    = isEmpty ? 12 : Math.max(...lines.map(l => l.length)) * fs * 0.3 + nodePad;
+    const hh    = isEmpty ? 12 : lines.length * fs * 0.7 + nodePad;
     overlays.push(
       `<rect data-id="${node.id}" data-type="node"
          x="${node.x - hw}" y="${node.y - hh}" width="${hw * 2}" height="${hh * 2}"
@@ -490,13 +678,13 @@ function buildSVG(w, h) {
     const edgeOpacity = isSelected ? '0.45' : '1';
     let path;
     if (edge.routing === 'orthogonal') {
-      const s = borderPoint(from, to.x, from.y);
-      const e = borderPoint(to, s.x, to.y);
+      const s = borderPoint(from, to.x, from.y, nodePad);
+      const e = borderPoint(to, s.x, to.y, nodePad);
       const m = (s.x + e.x) / 2;
       path = `M ${s.x} ${s.y} H ${m} V ${e.y} H ${e.x}`;
     } else {
-      const s = borderPoint(from, to.x, to.y);
-      const e = borderPoint(to, from.x, from.y);
+      const s = borderPoint(from, to.x, to.y, nodePad);
+      const e = borderPoint(to, from.x, from.y, nodePad);
       path = `M ${s.x} ${s.y} L ${e.x} ${e.y}`;
     }
     overlays.push(
@@ -517,6 +705,17 @@ function clearAllSelections() {
   multiSelection.clear();
   edgeMultiSel.clear();
   setSelection(null);
+}
+
+function selectComponent(nodeId) {
+  const { nodeIds } = getComponent(graph, nodeId);
+  clearAllSelections();
+  if (nodeIds.size >= 2) {
+    nodeIds.forEach(id => multiSelection.add(id));
+  } else {
+    setSelection({ type: 'node', id: nodeId });
+  }
+  redraw();
 }
 
 function setSelection(sel) { selection = sel; }
@@ -547,12 +746,40 @@ function getSelectionData() {
   return { type: 'edge', data: findEdge(graph, selection.id) };
 }
 
+// Converts a desired border-to-edge gap into a center-to-edge dist for an annotation item.
+// Assumes the arrow approaches from the perpendicular (short) axis — valid for above/below on horizontal edges.
+function computeAnnotDist(item, edgeGap, pad) {
+  const lines = String(item.label || ' ').split('\n');
+  const fs = item.fontSize ?? 12;
+  const h  = lines.length * fs * 1.4 + pad * 2;
+  return edgeGap + h / 2;
+}
+
+function avgFontSize() {
+  if (graph.nodes.length === 0) return 14;
+  return graph.nodes.reduce((s, n) => s + (n.style?.fontSize ?? 14), 0) / graph.nodes.length;
+}
+
+function scaleNodePositions(factor) {
+  if (!isFinite(factor) || Math.abs(factor - 1) < 0.001) return;
+  const cx = graph.nodes.reduce((s, n) => s + n.x, 0) / graph.nodes.length;
+  const cy = graph.nodes.reduce((s, n) => s + n.y, 0) / graph.nodes.length;
+  for (const node of graph.nodes) {
+    node.x = cx + (node.x - cx) * factor;
+    node.y = cy + (node.y - cy) * factor;
+  }
+  graph.meta.cellW = Math.round(graph.meta.cellW * factor);
+  graph.meta.cellH = Math.round(graph.meta.cellH * factor);
+}
+
 function tryAddEdge(fromId, toId, props) {
   try { addEdge(graph, fromId, toId, props); }
   catch (err) { alert(err.message); }
 }
 
 function doDelete() {
+  if (!selection && multiSelection.size < 2 && edgeMultiSel.size < 2) return;
+  pushHistory();
   if (multiSelection.size >= 2) {
     for (const id of [...multiSelection]) removeNode(graph, id);
     clearAllSelections();
@@ -587,6 +814,55 @@ function svgHeight() { return svg.clientHeight || 600; }
 let gridSize = 40;
 function snapGrid(v) { return Math.round(v / gridSize) * gridSize; }
 
+// ── Font style helpers ────────────────────────────────────────────────────────
+
+function toggleFontProp(prop, activeVal, inactiveVal) {
+  pushHistory();
+  if (selection?.type === 'node') {
+    const node = findNode(graph, selection.id);
+    if (!node) return;
+    updateNode(graph, selection.id, { style: { [prop]: node.style[prop] === activeVal ? inactiveVal : activeVal } });
+    redraw();
+  } else if (multiSelection.size >= 2) {
+    for (const id of multiSelection) {
+      const n = findNode(graph, id);
+      if (n) updateNode(graph, id, { style: { [prop]: n.style[prop] === activeVal ? inactiveVal : activeVal } });
+    }
+    redraw();
+  } else if (selection?.type === 'annot') {
+    const edge = findEdge(graph, selection.edgeId);
+    if (!edge) return;
+    const items = edge.annotations.items.map(it =>
+      it.id === selection.id ? { ...it, [prop]: it[prop] === activeVal ? inactiveVal : activeVal } : it
+    );
+    updateEdge(graph, edge.id, { annotations: { items } });
+    redraw();
+  }
+}
+
+function applyInlineFontProp(prop, activeVal, inactiveVal) {
+  pushHistory();
+  if (inlineEditNodeId) {
+    const node = findNode(graph, inlineEditNodeId);
+    if (!node) return;
+    const next = node.style[prop] === activeVal ? inactiveVal : activeVal;
+    updateNode(graph, inlineEditNodeId, { style: { [prop]: next } });
+    inlineEdit.style[prop] = next;
+    redrawQuiet();
+  } else if (inlineEditAnnot) {
+    const edge = findEdge(graph, inlineEditAnnot.edgeId);
+    if (!edge) return;
+    const cur   = edge.annotations.items.find(it => it.id === inlineEditAnnot.id)?.[prop] ?? inactiveVal;
+    const next  = cur === activeVal ? inactiveVal : activeVal;
+    const items = edge.annotations.items.map(it =>
+      it.id === inlineEditAnnot.id ? { ...it, [prop]: next } : it
+    );
+    updateEdge(graph, edge.id, { annotations: { items } });
+    inlineEdit.style[prop] = next;
+    redrawQuiet();
+  }
+}
+
 function showInlineEdit(node) {
   inlineEditNodeId = node.id;
   const rect = svg.getBoundingClientRect();
@@ -596,6 +872,8 @@ function showInlineEdit(node) {
   const fs   = node.style?.fontSize ?? 14;
 
   inlineEdit.value             = node.label;
+  inlineEdit.style.fontWeight  = node.style?.fontWeight ?? 'normal';
+  inlineEdit.style.fontStyle   = node.style?.fontStyle  ?? 'normal';
   inlineEdit.style.left        = `${sx - Math.max(hw, 40) * zoom}px`;
   inlineEdit.style.top         = `${sy - Math.max(hh, 15) * zoom}px`;
   inlineEdit.style.width       = `${Math.max(hw * 2, 80) * zoom}px`;
@@ -603,28 +881,71 @@ function showInlineEdit(node) {
   inlineEdit.style.fontSize    = `${fs * zoom}px`;
   inlineEdit.style.fontFamily  = graph.meta.fontFamily ?? 'sans-serif';
   inlineEdit.style.display     = 'block';
+  inlineToolbar.style.left    = inlineEdit.style.left;
+  inlineToolbar.style.top     = `${parseFloat(inlineEdit.style.top) - 36}px`;
+  inlineToolbar.style.display = 'flex';
+  inlineEdit.focus();
+  inlineEdit.select();
+}
+
+function showInlineEditAnnot(item, edgeId, e) {
+  inlineEditAnnot = { id: item.id, edgeId };
+  const label = String(item.label || '');
+  const lines = label.trim() ? label.split('\n') : [''];
+  const fs  = item.fontSize ?? 12;
+  const pad = graph.meta.nodePadding ?? 8;
+  const hw  = Math.max(Math.max(...lines.map(l => l.length)) * fs * 0.3 + pad, 40);
+  const hh  = Math.max(lines.length * fs * 0.7 + pad, 15);
+
+  inlineEdit.value            = item.label;
+  inlineEdit.style.fontWeight = item.fontWeight ?? 'normal';
+  inlineEdit.style.fontStyle  = item.fontStyle  ?? 'normal';
+  inlineEdit.style.left       = `${e.clientX - hw * zoom}px`;
+  inlineEdit.style.top        = `${e.clientY - hh * zoom}px`;
+  inlineEdit.style.width      = `${hw * 2 * zoom}px`;
+  inlineEdit.style.height     = `${hh * 2 * zoom}px`;
+  inlineEdit.style.fontSize   = `${fs * zoom}px`;
+  inlineEdit.style.fontFamily = graph.meta.fontFamily ?? 'sans-serif';
+  inlineEdit.style.display    = 'block';
+  inlineToolbar.style.left    = inlineEdit.style.left;
+  inlineToolbar.style.top     = `${e.clientY - hh * zoom - 36}px`;
+  inlineToolbar.style.display = 'flex';
   inlineEdit.focus();
   inlineEdit.select();
 }
 
 function hideInlineEdit(apply) {
-  if (!inlineEditNodeId) return;
+  if (!inlineEditNodeId && !inlineEditAnnot) return;
   if (apply) {
-    updateNode(graph, inlineEditNodeId, { label: inlineEdit.value });
+    pushHistory();
+    if (inlineEditNodeId) {
+      updateNode(graph, inlineEditNodeId, { label: inlineEdit.value });
+    } else if (inlineEditAnnot) {
+      const edge = findEdge(graph, inlineEditAnnot.edgeId);
+      if (edge) {
+        const items = edge.annotations.items.map(it =>
+          it.id === inlineEditAnnot.id ? { ...it, label: inlineEdit.value } : it
+        );
+        updateEdge(graph, edge.id, { annotations: { items } });
+      }
+    }
     redraw();
   }
-  inlineEdit.style.display = 'none';
+  inlineEdit.style.display    = 'none';
+  inlineToolbar.style.display = 'none';
   inlineEditNodeId = null;
+  inlineEditAnnot  = null;
 }
 
 function nodeHW(node) {
   const label = String(node.label || '');
-  if (!label.trim()) return { hw: 8, hh: 8 };
+  if (!label.trim()) return { hw: 12, hh: 12 };
   const lines = label.split('\n');
-  const fs = node.style?.fontSize ?? 14;
+  const fs  = node.style?.fontSize ?? 14;
+  const pad = graph.meta.nodePadding ?? 8;
   return {
-    hw: Math.max(...lines.map(l => l.length)) * fs * 0.3 + 14,
-    hh: lines.length * fs * 0.7 + 14,
+    hw: Math.max(...lines.map(l => l.length)) * fs * 0.3 + pad,
+    hh: lines.length * fs * 0.7 + pad,
   };
 }
 
@@ -682,6 +1003,7 @@ if (cached) {
     graph = fromJSON(cached);
     titleInput.value = graph.meta.title || '';
     fontSelect.value = graph.meta.fontFamily ?? 'sans-serif';
+    if (padInput) padInput.value = graph.meta.nodePadding ?? 8;
   } catch (e) {
     addNode(graph, { label: 'Start', x: 100, y: 200 });
   }

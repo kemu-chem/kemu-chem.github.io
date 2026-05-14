@@ -1,6 +1,5 @@
 {
   "_comment": "Full journal name (case-insensitive key) -> ISO 4 abbreviation. Add entries freely.",
-
   "Journal of the American Chemical Society": "J. Am. Chem. Soc.",
   "The Journal of the American Chemical Society": "J. Am. Chem. Soc.",
   "Accounts of Chemical Research": "Acc. Chem. Res.",
@@ -66,7 +65,6 @@
   "Organic Process Research & Development": "Org. Process Res. Dev.",
   "Organic Process Research and Development": "Org. Process Res. Dev.",
   "Organometallics": "Organometallics",
-
   "Chemical Science": "Chem. Sci.",
   "Chemical Communications": "Chem. Commun.",
   "Chemical Society Reviews": "Chem. Soc. Rev.",
@@ -76,6 +74,7 @@
   "Energy and Environmental Science": "Energy Environ. Sci.",
   "Faraday Discussions": "Faraday Discuss.",
   "Green Chemistry": "Green Chem.",
+  "Journal of Materials Chemistry": "J. Mater. Chem.",
   "Journal of Materials Chemistry A": "J. Mater. Chem. A",
   "Journal of Materials Chemistry B": "J. Mater. Chem. B",
   "Journal of Materials Chemistry C": "J. Mater. Chem. C",
@@ -97,7 +96,6 @@
   "Soft Matter": "Soft Matter",
   "Sustainable Energy & Fuels": "Sustainable Energy Fuels",
   "Sustainable Energy and Fuels": "Sustainable Energy Fuels",
-
   "Angewandte Chemie International Edition": "Angew. Chem. Int. Ed.",
   "Angewandte Chemie": "Angew. Chem.",
   "Advanced Electronic Materials": "Adv. Electron. Mater.",
@@ -126,7 +124,6 @@
   "Macromolecular Rapid Communications": "Macromol. Rapid Commun.",
   "Small": "Small",
   "WIREs Computational Molecular Science": "WIREs Comput. Mol. Sci.",
-
   "Applied Catalysis A: General": "Appl. Catal. A: Gen.",
   "Applied Catalysis B: Environmental": "Appl. Catal. B: Environ.",
   "Applied Surface Science": "Appl. Surf. Sci.",
@@ -161,7 +158,6 @@
   "Tetrahedron": "Tetrahedron",
   "Tetrahedron Letters": "Tetrahedron Lett.",
   "Tetrahedron: Asymmetry": "Tetrahedron: Asymmetry",
-
   "Nature": "Nature",
   "Nature Catalysis": "Nat. Catal.",
   "Nature Chemistry": "Nat. Chem.",
@@ -178,7 +174,6 @@
   "Physical Review B": "Phys. Rev. B",
   "Proceedings of the National Academy of Sciences": "Proc. Natl. Acad. Sci. U.S.A.",
   "Proceedings of the National Academy of Sciences of the United States of America": "Proc. Natl. Acad. Sci. U.S.A.",
-
   "Bulletin of the Chemical Society of Japan": "Bull. Chem. Soc. Jpn.",
   "Chemistry Letters": "Chem. Lett.",
   "Helvetica Chimica Acta": "Helv. Chim. Acta",
@@ -187,7 +182,6 @@
   "Molecules": "Molecules",
   "Synthesis": "Synthesis",
   "Synlett": "Synlett",
-
   "Applied Physics Letters": "Appl. Phys. Lett.",
   "Journal of Applied Physics": "J. Appl. Phys.",
   "Nature Electronics": "Nat. Electron.",
@@ -197,7 +191,6 @@
   "Journal of Physics: Condensed Matter": "J. Phys. Condens. Matter",
   "Journal of Physics D: Applied Physics": "J. Phys. D: Appl. Phys.",
   "Semiconductor Science and Technology": "Semicond. Sci. Technol.",
-
   "Biosensors and Bioelectronics": "Biosens. Bioelectron.",
   "Journal of The Electrochemical Society": "J. Electrochem. Soc.",
   "Journal of Power Sources": "J. Power Sources",
@@ -206,7 +199,6 @@
   "Bioelectrochemistry": "Bioelectrochemistry",
   "Electrochemistry Communications": "Electrochem. Commun.",
   "Flexible and Printed Electronics": "Flex. Print. Electron.",
-
   "Journal of Computational Chemistry": "J. Comput. Chem.",
   "Bioinformatics": "Bioinformatics",
   "IEEE Transactions on Visualization and Computer Graphics": "IEEE Trans. Vis. Comput. Graph.",
@@ -214,7 +206,6 @@
   "PLOS Computational Biology": "PLOS Comput. Biol.",
   "Computer Graphics Forum": "Comput. Graph. Forum",
   "Briefings in Bioinformatics": "Briefings Bioinformatics",
-
   "Cell": "Cell",
   "Molecular Cell": "Mol. Cell",
   "Cell Stem Cell": "Cell Stem Cell",
@@ -240,7 +231,6 @@
   "Nature Structural and Molecular Biology": "Nat. Struct. Mol. Biol.",
   "The Lancet": "Lancet",
   "The New England Journal of Medicine": "N. Engl. J. Med.",
-
   "Reviews of Modern Physics": "Rev. Mod. Phys.",
   "Nature Physics": "Nat. Phys.",
   "Nature Photonics": "Nat. Photonics",
@@ -261,7 +251,6 @@
   "Applied Physics Express": "Appl. Phys. Express",
   "Europhysics Letters": "EPL",
   "Journal of Physics A: Mathematical and Theoretical": "J. Phys. A: Math. Theor.",
-
   "The Astrophysical Journal": "Astrophys. J.",
   "The Astrophysical Journal Letters": "Astrophys. J. Lett.",
   "The Astrophysical Journal Supplement Series": "Astrophys. J. Suppl. Ser.",
@@ -273,7 +262,6 @@
   "The Astronomical Journal": "Astron. J.",
   "Publications of the Astronomical Society of the Pacific": "Publ. Astron. Soc. Pac.",
   "Publications of the Astronomical Society of Japan": "Publ. Astron. Soc. Jpn.",
-
   "Annals of Mathematics": "Ann. Math.",
   "Journal of the American Mathematical Society": "J. Am. Math. Soc.",
   "Acta Mathematica": "Acta Math.",

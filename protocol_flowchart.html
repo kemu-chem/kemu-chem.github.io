@@ -99,6 +99,10 @@
   <input id="title-input" type="text" value="Protocol Flowchart" placeholder="Title">
   <div class="tb-sep"></div>
 
+  <button class="tb-btn" id="btn-undo" title="Undo (Ctrl+Z)">↩ Undo</button>
+  <button class="tb-btn" id="btn-redo" title="Redo (Ctrl+Y)">↪ Redo</button>
+  <div class="tb-sep"></div>
+
   <span class="tb-label">Edit</span>
   <button class="tb-btn" id="btn-add-node">+ Add Node</button>
   <button class="tb-btn" id="btn-branch-up">↑ Branch Up</button>
@@ -106,6 +110,7 @@
   <button class="tb-btn" id="btn-connect-mode">→ Connect</button>
   <button class="tb-btn" id="btn-select-all-nodes">Select All Nodes</button>
   <button class="tb-btn" id="btn-select-all-edges">Select All Edges</button>
+  <button class="tb-btn" id="btn-select-component">Select Component</button>
   <button class="tb-btn danger" id="btn-delete">Delete</button>
   <div class="tb-sep"></div>
 
@@ -118,6 +123,10 @@
   <button class="tb-btn active" id="btn-grid-snap">Grid</button>
   <input id="grid-size" type="number" value="40" min="1" max="200" step="1"
     title="Grid size (px)"
+    style="width:52px;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;color:#334155;">
+  <span class="tb-label">Padding</span>
+  <input id="pad-input" type="number" value="8" min="0" max="60" step="1"
+    title="Node padding (px)"
     style="width:52px;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;color:#334155;">
   <div class="tb-sep"></div>
 
@@ -154,5 +163,9 @@
 <div id="statusbar">Nodes: 0 / Edges: 0</div>
 
 <textarea id="inline-edit"></textarea>
+<div id="inline-toolbar" style="position:fixed;display:none;flex-direction:row;gap:4px;padding:3px 6px;background:white;border:1px solid #e2e8f0;border-radius:5px;box-shadow:0 2px 6px rgba(0,0,0,.15);z-index:201;align-items:center;">
+  <button id="itb-sub" style="padding:2px 8px;font-size:12px;border:1px solid #e2e8f0;border-radius:4px;background:white;cursor:pointer;color:#334155;" title="下付き文字 (0–9, +/-)">x<sub>n</sub></button>
+  <button id="itb-sup" style="padding:2px 8px;font-size:12px;border:1px solid #e2e8f0;border-radius:4px;background:white;cursor:pointer;color:#334155;" title="上付き文字 (0–9, +/-)">x<sup>n</sup></button>
+</div>
 </body>
 </html>
