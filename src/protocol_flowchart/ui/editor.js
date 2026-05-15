@@ -1,7 +1,8 @@
 import {
   createGraph, addNode, addEdge, removeNode, removeEdge,
   updateNode, updateEdge, findNode, findEdge,
-  toJSON, fromJSON, getComponent,
+  edgesTo, edgesFrom,
+  toJSON, fromJSON, getComponent, uid,
 } from '../core/graph.js';
 import { applyLayout } from '../core/layout.js';
 import { renderSVG, downloadSVG, borderPoint } from '../renderers/svg.js';
@@ -22,8 +23,10 @@ let viewOffset        = { x: 0, y: 0 };
 let clickBlocked      = false;
 let lastDragMoved     = false;
 let snapMode          = true;
-let snapStep          = 0.25;
+let snapStep          = 0.1;
 let gridSnap          = true;
+let gridSize          = 10;
+let nodeDefaults      = { shape: 'none', style: { borderColor: '#333333', fillColor: '#ffffff', fontSize: 14, fontWeight: 'normal', fontStyle: 'normal' } };
 
 // ── DOM ───────────────────────────────────────────────────────────────────────
 
@@ -37,6 +40,9 @@ const padInput     = document.getElementById('pad-input');
 const fontSelect   = document.getElementById('font-select');
 const inlineEdit    = document.getElementById('inline-edit');
 const inlineToolbar = document.getElementById('inline-toolbar');
+
+snapStepInput.value = snapStep;
+gridSizeInput.value = gridSize;
 
 let inlineEditNodeId = null;
 let inlineEditAnnot  = null;  // { id, edgeId } while editing an annotation inline
@@ -92,7 +98,7 @@ document.getElementById('btn-add-node').addEventListener('click', () => {
   if (edge) {
     const from  = findNode(graph, edge.fromId);
     const to    = findNode(graph, edge.toId);
-    const node  = addNode(graph, { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 });
+    const node  = makeNode({ x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 });
     const saved = { annotations: { ...edge.annotations }, routing: edge.routing, arrowStyle: { ...edge.arrowStyle } };
     removeEdge(graph, edge.id);
     tryAddEdge(edge.fromId, node.id, saved);
@@ -100,14 +106,14 @@ document.getElementById('btn-add-node').addEventListener('click', () => {
     clearAllSelections();
     setSelection({ type: 'node', id: node.id });
   } else if (focused) {
-    const node = addNode(graph, { x: focused.x + graph.meta.cellW, y: focused.y });
+    const node = makeNode({ x: focused.x + graph.meta.cellW, y: focused.y });
     tryAddEdge(focused.id, node.id);
     clearAllSelections();
     setSelection({ type: 'node', id: node.id });
   } else {
-    const node = addNode(graph, {
-      x: svgWidth()  / 2 - viewOffset.x,
-      y: svgHeight() / 2 - viewOffset.y,
+    const node = makeNode({
+      x: svgWidth()  / (2 * zoom) - viewOffset.x,
+      y: svgHeight() / (2 * zoom) - viewOffset.y,
     });
     clearAllSelections();
     setSelection({ type: 'node', id: node.id });
@@ -119,7 +125,7 @@ document.getElementById('btn-branch-up').addEventListener('click', () => {
   const focused = selectedNode();
   if (!focused) return;
   pushHistory();
-  const node = addNode(graph, { x: focused.x + graph.meta.cellW, y: focused.y - graph.meta.cellH });
+  const node = makeNode({ x: focused.x + graph.meta.cellW, y: focused.y - graph.meta.cellH });
   tryAddEdge(focused.id, node.id);
   clearAllSelections();
   setSelection({ type: 'node', id: node.id });
@@ -130,7 +136,7 @@ document.getElementById('btn-branch-down').addEventListener('click', () => {
   const focused = selectedNode();
   if (!focused) return;
   pushHistory();
-  const node = addNode(graph, { x: focused.x + graph.meta.cellW, y: focused.y + graph.meta.cellH });
+  const node = makeNode({ x: focused.x + graph.meta.cellW, y: focused.y + graph.meta.cellH });
   tryAddEdge(focused.id, node.id);
   clearAllSelections();
   setSelection({ type: 'node', id: node.id });
@@ -171,6 +177,7 @@ document.getElementById('btn-select-component').addEventListener('click', () => 
   selectComponent(node.id);
 });
 
+document.getElementById('btn-merge').addEventListener('click', mergeSelection);
 document.getElementById('btn-delete').addEventListener('click', doDelete);
 
 document.getElementById('btn-snap').addEventListener('click', (e) => {
@@ -225,6 +232,39 @@ document.getElementById('btn-save-json').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+document.getElementById('btn-save-selection-json').addEventListener('click', () => {
+  const ids = new Set(
+    multiSelection.size >= 1 ? [...multiSelection]
+    : selection?.type === 'node' ? [selection.id]
+    : []
+  );
+  if (ids.size === 0) { statusbar.textContent = 'No nodes selected'; return; }
+
+  const nodes = [...ids].map(id => findNode(graph, id)).filter(Boolean);
+  const edges = graph.edges.filter(e => ids.has(e.fromId) && ids.has(e.toId));
+  const subgraph = { ...graph, nodes, edges };
+  const blob = new Blob([JSON.stringify(subgraph, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = (graph.meta.title || 'protocol_flowchart') + '_selection.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('btn-save-selection-svg').addEventListener('click', () => {
+  const ids = new Set(
+    multiSelection.size >= 1 ? [...multiSelection]
+    : selection?.type === 'node' ? [selection.id]
+    : []
+  );
+  if (ids.size === 0) { statusbar.textContent = 'No nodes selected'; return; }
+
+  const nodes = [...ids].map(id => findNode(graph, id)).filter(Boolean);
+  const edges = graph.edges.filter(e => ids.has(e.fromId) && ids.has(e.toId));
+  downloadSVG({ ...graph, nodes, edges });
+});
+
 document.getElementById('btn-load-json').addEventListener('click', () => jsonFileInput.click());
 
 jsonFileInput.addEventListener('change', () => {
@@ -266,6 +306,28 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') { e.preventDefault(); toggleFontProp('fontStyle', 'italic', 'normal'); }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); edgeMultiSel.clear(); multiSelection.clear(); graph.nodes.forEach(n => multiSelection.add(n.id)); setSelection(null); redraw(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') { e.preventDefault(); copySelection(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') { e.preventDefault(); pasteFromClipboard(); }
+
+  const arrowMap = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  if (arrowMap[e.key]) {
+    const targetIds = multiSelection.size >= 2
+      ? [...multiSelection]
+      : (selection?.type === 'node' ? [selection.id] : null);
+    if (targetIds) {
+      e.preventDefault();
+      const step = gridSnap ? gridSize : 1;
+      const [dx, dy] = arrowMap[e.key].map(v => v * step);
+      if (!e.repeat) pushHistory();
+      for (const id of targetIds) {
+        const n = findNode(graph, id);
+        if (!n) continue;
+        updateNode(graph, id, { x: n.x + dx, y: n.y + dy });
+      }
+      redrawQuiet();
+    }
+  }
 });
 
 // ── SVG interaction ───────────────────────────────────────────────────────────
@@ -280,15 +342,15 @@ svg.addEventListener('click', (e) => {
     const node = findNode(graph, nodeId);
     if (!node) return;
     pushHistory();
-    let newNode;
+    let created;
     if (action === 'extend') {
-      newNode = addNode(graph, { x: node.x + graph.meta.cellW, y: node.y });
+      created = makeNode({ x: node.x + graph.meta.cellW, y: node.y });
     } else if (action === 'branch-up') {
-      newNode = addNode(graph, { x: node.x + graph.meta.cellW, y: node.y - graph.meta.cellH });
+      created = makeNode({ x: node.x + graph.meta.cellW, y: node.y - graph.meta.cellH });
     } else if (action === 'branch-down') {
-      newNode = addNode(graph, { x: node.x + graph.meta.cellW, y: node.y + graph.meta.cellH });
+      created = makeNode({ x: node.x + graph.meta.cellW, y: node.y + graph.meta.cellH });
     }
-    if (newNode) { tryAddEdge(node.id, newNode.id); clearAllSelections(); setSelection({ type: 'node', id: newNode.id }); }
+    if (created) { tryAddEdge(node.id, created.id); clearAllSelections(); setSelection({ type: 'node', id: created.id }); }
     redraw();
     return;
   }
@@ -320,8 +382,18 @@ svg.addEventListener('click', (e) => {
   }
 
   // Alt+click on node → select its weakly connected component
+  // Shift+Alt+click → add component to existing multiSelection
   if (type === 'node' && e.altKey) {
-    selectComponent(id);
+    if (e.shiftKey) {
+      const { nodeIds } = getComponent(graph, id);
+      edgeMultiSel.clear();
+      if (selection?.type === 'node') multiSelection.add(selection.id);
+      nodeIds.forEach(nid => multiSelection.add(nid));
+      setSelection(null);
+      redraw();
+    } else {
+      selectComponent(id);
+    }
     return;
   }
 
@@ -437,8 +509,7 @@ svg.addEventListener('mouseup', () => {
 
 
 inlineEdit.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { e.stopPropagation(); hideInlineEdit(false); }
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); hideInlineEdit(true); }
+  if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); hideInlineEdit(true); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
     e.preventDefault();
     applyInlineFontProp('fontWeight', 'bold', 'normal');
@@ -447,6 +518,11 @@ inlineEdit.addEventListener('keydown', (e) => {
     e.preventDefault();
     applyInlineFontProp('fontStyle', 'italic', 'normal');
   }
+});
+
+inlineEdit.addEventListener('input', () => {
+  inlineEdit.style.height = 'auto';
+  inlineEdit.style.height = `${inlineEdit.scrollHeight}px`;
 });
 
 inlineEdit.addEventListener('blur', () => hideInlineEdit(true));
@@ -528,6 +604,14 @@ function redraw() {
   let panelHistoryPushed = false;  // push history once per panel-session
 
   renderPanel(sel, (id, props) => {
+    if (sel.type === 'defaults') {
+      if (props.shape !== undefined) nodeDefaults.shape = props.shape;
+      if (props.style) Object.assign(nodeDefaults.style, props.style);
+      saveNodeDefaults();
+      const needsRedraw = props.style?.fontWeight !== undefined || props.style?.fontStyle !== undefined;
+      needsRedraw ? redraw() : redrawQuiet();
+      return;
+    }
     if (!panelHistoryPushed) { pushHistory(); panelHistoryPushed = true; }
 
     // fontWeight/fontStyle changes need full redraw so panel B/I buttons update visually
@@ -629,7 +713,7 @@ function redraw() {
       if (structural) redraw();
       else redrawQuiet();
     }
-  }, tStep);
+  }, tStep, nodeDefaults);
 
   statusbar.textContent = `Nodes: ${graph.nodes.length} / Edges: ${graph.edges.length} | Zoom: ${Math.round(zoom * 100)}%`;
   scheduleSave();
@@ -736,7 +820,7 @@ function getSelectionData() {
     const edges = [...edgeMultiSel].map(id => findEdge(graph, id)).filter(Boolean);
     return { type: 'multi-edge', data: edges };
   }
-  if (!selection) return null;
+  if (!selection) return { type: 'defaults', data: nodeDefaults };
   if (selection.type === 'annot') {
     const edge = findEdge(graph, selection.edgeId);
     const item = edge?.annotations?.items?.find(it => it.id === selection.id);
@@ -772,9 +856,64 @@ function scaleNodePositions(factor) {
   graph.meta.cellH = Math.round(graph.meta.cellH * factor);
 }
 
+function makeNode(props) {
+  return addNode(graph, { shape: nodeDefaults.shape, style: { ...nodeDefaults.style }, ...props });
+}
+
 function tryAddEdge(fromId, toId, props) {
   try { addEdge(graph, fromId, toId, props); }
   catch (err) { alert(err.message); }
+}
+
+const CLIP_TYPE    = 'pf-subgraph';
+const PASTE_OFFSET = 20;
+
+function copySelection() {
+  const ids = new Set(
+    multiSelection.size >= 1 ? [...multiSelection]
+    : selection?.type === 'node' ? [selection.id]
+    : []
+  );
+  if (ids.size === 0) return;
+
+  const nodes = [...ids].map(id => findNode(graph, id)).filter(Boolean);
+  const edges = graph.edges.filter(e => ids.has(e.fromId) && ids.has(e.toId));
+
+  const payload = JSON.stringify({ _clipType: CLIP_TYPE, nodes, edges });
+  navigator.clipboard.writeText(payload).catch(() => {});
+  statusbar.textContent = `Copied ${nodes.length} node(s), ${edges.length} edge(s)`;
+}
+
+async function pasteFromClipboard() {
+  let text;
+  try { text = await navigator.clipboard.readText(); }
+  catch { statusbar.textContent = 'Clipboard read failed (permission denied?)'; return; }
+
+  let payload;
+  try { payload = JSON.parse(text); } catch { return; }
+  if (payload?._clipType !== CLIP_TYPE || !Array.isArray(payload.nodes)) return;
+
+  pushHistory();
+
+  const idMap = new Map(payload.nodes.map(n => [n.id, uid()]));
+
+  const newIds = [];
+  for (const n of payload.nodes) {
+    const newId = idMap.get(n.id);
+    addNode(graph, { ...n, id: newId, x: n.x + PASTE_OFFSET, y: n.y + PASTE_OFFSET });
+    newIds.push(newId);
+  }
+  for (const e of payload.edges) {
+    const from = idMap.get(e.fromId), to = idMap.get(e.toId);
+    if (!from || !to) continue;
+    try { addEdge(graph, from, to, { ...e, id: uid() }); } catch { /* cycle guard */ }
+  }
+
+  clearAllSelections();
+  newIds.forEach(id => multiSelection.add(id));
+  if (newIds.length === 1) { setSelection({ type: 'node', id: newIds[0] }); multiSelection.clear(); }
+  redraw();
+  statusbar.textContent = `Pasted ${newIds.length} node(s)`;
 }
 
 function doDelete() {
@@ -808,10 +947,42 @@ function doDelete() {
   redraw();
 }
 
+function mergeSelection() {
+  if (multiSelection.size < 2) return;
+  pushHistory();
+
+  const keeper = graph.nodes.find(n => multiSelection.has(n.id));
+  const others = new Set([...multiSelection].filter(id => id !== keeper.id));
+
+  for (const otherId of others) {
+    const incoming = edgesTo(graph, otherId).filter(e => !others.has(e.fromId) && e.fromId !== keeper.id);
+    const outgoing = edgesFrom(graph, otherId).filter(e => !others.has(e.toId) && e.toId !== keeper.id);
+
+    for (const edge of incoming) {
+      const dup = graph.edges.some(e => e.fromId === edge.fromId && e.toId === keeper.id);
+      if (!dup) {
+        try { addEdge(graph, edge.fromId, keeper.id, { routing: edge.routing, arrowStyle: { ...edge.arrowStyle }, annotations: edge.annotations }); }
+        catch (_) {}
+      }
+    }
+    for (const edge of outgoing) {
+      const dup = graph.edges.some(e => e.fromId === keeper.id && e.toId === edge.toId);
+      if (!dup) {
+        try { addEdge(graph, keeper.id, edge.toId, { routing: edge.routing, arrowStyle: { ...edge.arrowStyle }, annotations: edge.annotations }); }
+        catch (_) {}
+      }
+    }
+  }
+
+  for (const otherId of others) removeNode(graph, otherId);
+  clearAllSelections();
+  setSelection({ type: 'node', id: keeper.id });
+  redraw();
+}
+
 function svgWidth()  { return svg.clientWidth  || 1200; }
 function svgHeight() { return svg.clientHeight || 600; }
 
-let gridSize = 40;
 function snapGrid(v) { return Math.round(v / gridSize) * gridSize; }
 
 // ── Font style helpers ────────────────────────────────────────────────────────
@@ -877,10 +1048,12 @@ function showInlineEdit(node) {
   inlineEdit.style.left        = `${sx - Math.max(hw, 40) * zoom}px`;
   inlineEdit.style.top         = `${sy - Math.max(hh, 15) * zoom}px`;
   inlineEdit.style.width       = `${Math.max(hw * 2, 80) * zoom}px`;
-  inlineEdit.style.height      = `${Math.max(hh * 2, 30) * zoom}px`;
+  inlineEdit.style.minHeight   = `${Math.max(hh * 2, 30) * zoom}px`;
+  inlineEdit.style.height      = 'auto';
   inlineEdit.style.fontSize    = `${fs * zoom}px`;
   inlineEdit.style.fontFamily  = graph.meta.fontFamily ?? 'sans-serif';
   inlineEdit.style.display     = 'block';
+  inlineEdit.style.height      = `${inlineEdit.scrollHeight}px`;
   inlineToolbar.style.left    = inlineEdit.style.left;
   inlineToolbar.style.top     = `${parseFloat(inlineEdit.style.top) - 36}px`;
   inlineToolbar.style.display = 'flex';
@@ -903,10 +1076,12 @@ function showInlineEditAnnot(item, edgeId, e) {
   inlineEdit.style.left       = `${e.clientX - hw * zoom}px`;
   inlineEdit.style.top        = `${e.clientY - hh * zoom}px`;
   inlineEdit.style.width      = `${hw * 2 * zoom}px`;
-  inlineEdit.style.height     = `${hh * 2 * zoom}px`;
+  inlineEdit.style.minHeight  = `${hh * 2 * zoom}px`;
+  inlineEdit.style.height     = 'auto';
   inlineEdit.style.fontSize   = `${fs * zoom}px`;
   inlineEdit.style.fontFamily = graph.meta.fontFamily ?? 'sans-serif';
   inlineEdit.style.display    = 'block';
+  inlineEdit.style.height     = `${inlineEdit.scrollHeight}px`;
   inlineToolbar.style.left    = inlineEdit.style.left;
   inlineToolbar.style.top     = `${e.clientY - hh * zoom - 36}px`;
   inlineToolbar.style.display = 'flex';
@@ -982,7 +1157,8 @@ function svgPoint(e) {
 
 // ── localStorage auto-save ───────────────────────────────────────────────────
 
-const STORAGE_KEY = 'pfc_autosave';
+const STORAGE_KEY          = 'pfc_autosave';
+const STORAGE_KEY_DEFAULTS = 'pfc_node_defaults';
 let saveTimer = null;
 
 function scheduleSave() {
@@ -995,7 +1171,20 @@ function scheduleSave() {
   }, 800);
 }
 
+function saveNodeDefaults() {
+  try { localStorage.setItem(STORAGE_KEY_DEFAULTS, JSON.stringify(nodeDefaults)); } catch (e) {}
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
+
+const cachedDefaults = localStorage.getItem(STORAGE_KEY_DEFAULTS);
+if (cachedDefaults) {
+  try {
+    const d = JSON.parse(cachedDefaults);
+    if (d.shape  !== undefined) nodeDefaults.shape = d.shape;
+    if (d.style)  Object.assign(nodeDefaults.style, d.style);
+  } catch (e) {}
+}
 
 const cached = localStorage.getItem(STORAGE_KEY);
 if (cached) {

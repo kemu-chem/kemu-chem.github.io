@@ -17,16 +17,17 @@ const SCRIPT_SUP = Object.fromEntries([
 ]);
 
 // tStep: actual slider step value computed in editor (snapMode ? snapStep : 0.01)
-export function renderPanel(selection, updateFn, tStep = 0.25) {
+export function renderPanel(selection, updateFn, tStep = 0.25, defaults = null) {
   if (!selection?.data) {
     panelEl.innerHTML = '<p class="panel-empty">Please select a node or edge</p>';
     return;
   }
-  if (selection.type === 'node') renderNodePanel(selection.data, updateFn);
+  if (selection.type === 'defaults') renderDefaultPanel(selection.data, updateFn);
+  else if (selection.type === 'node') renderNodePanel(selection.data, updateFn);
   else if (selection.type === 'multi') renderMultiPanel(selection.data, updateFn);
   else if (selection.type === 'multi-edge') renderMultiEdgePanel(selection.data, updateFn);
   else if (selection.type === 'annot') renderAnnotPanel(selection.data, updateFn, tStep);
-  else renderEdgePanel(selection.data, updateFn, tStep);
+  else renderEdgePanel(selection.data, updateFn, tStep, defaults);
 }
 
 // ── Node panel ────────────────────────────────────────────────────────────────
@@ -53,6 +54,30 @@ function renderNodePanel(node, updateFn) {
   );
   panelEl.querySelector('[name="btn-italic"]')?.addEventListener('click', () =>
     updateFn(node.id, { style: { fontStyle: node.style.fontStyle === 'italic' ? 'normal' : 'italic' } })
+  );
+}
+
+// ── Default node style panel ──────────────────────────────────────────────────
+
+function renderDefaultPanel(defaults, updateFn) {
+  panelEl.innerHTML = `
+    <h3 style="${H3}">Default Node Style</h3>
+    <p style="font-size:11px;color:#94a3b8;margin-bottom:10px;">Applied to newly created nodes.</p>
+    ${field('Shape', selectEl('shape', defaults.shape, [['none', 'None'], ['box', 'Box'], ['circle', 'Circle'], ['diamond', 'Diamond']]))}
+    ${field('Border Color', colorEl('borderColor', defaults.style.borderColor))}
+    ${field('Fill Color',   colorEl('fillColor',   defaults.style.fillColor))}
+    ${field('Font Size',    numberEl('fontSize',   defaults.style.fontSize, 8, 36))}
+    ${field('Style', boldItalicBtns(defaults.style.fontWeight, defaults.style.fontStyle))}
+  `;
+  bind('select[name="shape"]',      'change', v => updateFn('defaults', { shape: v }));
+  bind('input[name="borderColor"]', 'input',  v => updateFn('defaults', { style: { borderColor: v } }));
+  bind('input[name="fillColor"]',   'input',  v => updateFn('defaults', { style: { fillColor: v } }));
+  bind('input[name="fontSize"]',    'input',  v => updateFn('defaults', { style: { fontSize: Number(v) } }));
+  panelEl.querySelector('[name="btn-bold"]')?.addEventListener('click', () =>
+    updateFn('defaults', { style: { fontWeight: defaults.style.fontWeight === 'bold' ? 'normal' : 'bold' } })
+  );
+  panelEl.querySelector('[name="btn-italic"]')?.addEventListener('click', () =>
+    updateFn('defaults', { style: { fontStyle: defaults.style.fontStyle === 'italic' ? 'normal' : 'italic' } })
   );
 }
 
@@ -219,7 +244,7 @@ function renderAnnotPanel(item, updateFn, tStep) {
 
 // ── Edge panel ────────────────────────────────────────────────────────────────
 
-function renderEdgePanel(edge, updateFn, tStep) {
+function renderEdgePanel(edge, updateFn, tStep, defaults = null) {
   const items = edge.annotations.items ?? [];
 
   panelEl.innerHTML = `
@@ -294,7 +319,13 @@ function renderEdgePanel(edge, updateFn, tStep) {
   }
 
   document.getElementById('btn-add-annot').addEventListener('click', () => {
-    const newItem = { id: uid(), side: 'above', t: 0.5, label: '', shape: 'none', dist: 40, showArrow: true, snap: true, arrowGap: 2 };
+    const newItem = {
+      id: uid(), side: 'above', t: 0.5, label: '', dist: 40, showArrow: true, snap: true, arrowGap: 2,
+      shape:      defaults?.shape              ?? 'none',
+      fontSize:   defaults?.style?.fontSize    ?? 12,
+      fontWeight: defaults?.style?.fontWeight  ?? 'normal',
+      fontStyle:  defaults?.style?.fontStyle   ?? 'normal',
+    };
     updateFn(edge.id, { annotations: { items: [...items, newItem] } });
   });
 }

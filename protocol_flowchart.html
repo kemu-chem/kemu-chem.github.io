@@ -111,17 +111,18 @@
   <button class="tb-btn" id="btn-select-all-nodes">Select All Nodes</button>
   <button class="tb-btn" id="btn-select-all-edges">Select All Edges</button>
   <button class="tb-btn" id="btn-select-component">Select Component</button>
+  <button class="tb-btn" id="btn-merge">Merge Nodes</button>
   <button class="tb-btn danger" id="btn-delete">Delete</button>
   <div class="tb-sep"></div>
 
   <span class="tb-label">View</span>
   <button class="tb-btn" id="btn-relayout">Reset Layout</button>
   <button class="tb-btn active" id="btn-snap">Snap</button>
-  <input id="snap-step" type="number" value="0.25" min="0.01" max="1" step="0.05"
+  <input id="snap-step" type="number" min="0.01" max="1" step="0.05"
     title="Snap Step"
     style="width:58px;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;color:#334155;">
   <button class="tb-btn active" id="btn-grid-snap">Grid</button>
-  <input id="grid-size" type="number" value="40" min="1" max="200" step="1"
+  <input id="grid-size" type="number" min="1" max="200" step="1"
     title="Grid size (px)"
     style="width:52px;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;color:#334155;">
   <span class="tb-label">Padding</span>
@@ -147,6 +148,8 @@
   <button class="tb-btn" id="btn-export-svg">Save SVG</button>
   <button class="tb-btn" id="btn-export-pptx">PPTXExport</button>
   <button class="tb-btn" id="btn-save-json">Save JSON</button>
+  <button class="tb-btn" id="btn-save-selection-json">Save Selection</button>
+  <button class="tb-btn" id="btn-save-selection-svg">Selection SVG</button>
   <button class="tb-btn" id="btn-load-json">Load JSON</button>
   <input type="file" id="json-file-input" accept=".json" style="display:none">
 </div>
