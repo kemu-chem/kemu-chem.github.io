@@ -21,7 +21,7 @@ export function renderSVG(graph, opts = {}) {
   // Per-edge main arrow markers
   for (const edge of graph.edges) {
     const color = edge.arrowStyle.type === 'dashed' ? '#666' : '#333';
-    parts.push(arrowMarkerDef(`arrow-${edge.id}`, color, edge.arrowStyle.headSize));
+    parts.push(arrowMarkerDef(`arrow-${edge.id}`, color, edge.arrowStyle.headSize, edge.arrowStyle.thickness));
     // Per-annotation arrow markers (color/size customisable)
     for (const item of (edge.annotations?.items ?? [])) {
       if (!(item.showArrow ?? true)) continue;
@@ -29,6 +29,7 @@ export function renderSVG(graph, opts = {}) {
         `annot-arrow-${item.id}`,
         item.arrowColor ?? '#555555',
         item.arrowHeadSize ?? 6,
+        item.arrowThickness ?? 1,
       ));
     }
   }
@@ -74,7 +75,7 @@ function renderNode(node, overrideStyle = {}, fontFamily = 'sans-serif', pad = 8
   const fw = style.fontWeight ?? 'normal';
   const fi = style.fontStyle  ?? 'normal';
   const textEl = lines.map((l, i) =>
-    `<tspan x="${x}" dy="${i === 0 ? -(lines.length - 1) * lineH / 2 + fs * 0.35 : lineH}">${esc(l)}</tspan>`
+    `<tspan x="${x}" dy="${i === 0 ? -(lines.length - 1) * lineH / 2 + fs * 0.35 : lineH}">${spanify(l, fs)}</tspan>`
   ).join('');
   const label = `<text x="${x}" y="${y}" text-anchor="middle" font-size="${fs}" font-weight="${fw}" font-style="${fi}" fill="${stroke}" font-family="${fontFamily}">${textEl}</text>`;
 
@@ -285,8 +286,9 @@ function coilArrow(cx, cy, r, thickness, headSize) {
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
 
-function arrowMarkerDef(id, color, size) {
-  return `<marker id="${id}" markerWidth="${size}" markerHeight="${size}" refX="${size}" refY="${size / 2}" orient="auto" markerUnits="userSpaceOnUse"><polygon points="0 0, ${size} ${size / 2}, 0 ${size}" fill="${color}"/></marker>`;
+function arrowMarkerDef(id, color, size, thickness = 1) {
+  const s = size / thickness;
+  return `<marker id="${id}" markerWidth="${s}" markerHeight="${s}" refX="${s}" refY="${s / 2}" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, ${s} ${s / 2}, 0 ${s}" fill="${color}"/></marker>`;
 }
 
 function svgOpen(w, h, vx = 0, vy = 0) {
@@ -297,6 +299,26 @@ function esc(str) {
   return String(str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+const _SUB_FROM = {'₀':'0','₁':'1','₂':'2','₃':'3','₄':'4','₅':'5','₆':'6','₇':'7','₈':'8','₉':'9','₊':'+','₋':'-'};
+const _SUP_FROM = {'⁰':'0','¹':'1','²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9','⁺':'+','⁻':'-'};
+
+function spanify(text, fs) {
+  text = String(text).replaceAll('℃', '°C'); // ℃ → °C
+  const segments = [];
+  let cur = { type: 'normal', chars: [] };
+  for (const ch of text) {
+    const type = _SUB_FROM[ch] ? 'sub' : _SUP_FROM[ch] ? 'sup' : 'normal';
+    if (type !== cur.type) { if (cur.chars.length) segments.push(cur); cur = { type, chars: [] }; }
+    cur.chars.push(ch);
+  }
+  if (cur.chars.length) segments.push(cur);
+  return segments.map(seg => {
+    if (seg.type === 'normal') return esc(seg.chars.join(''));
+    const ascii = seg.chars.map(c => seg.type === 'sub' ? _SUB_FROM[c] : _SUP_FROM[c]).join('');
+    return `<tspan baseline-shift="${seg.type === 'sub' ? 'sub' : 'super'}" font-size="${(0.7 * fs).toFixed(1)}">${esc(ascii)}</tspan>`;
+  }).join('');
 }
 
 // ── Bounding box ──────────────────────────────────────────────────────────────
