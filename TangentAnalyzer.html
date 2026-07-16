@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tangent Analyzer</title>
+    <link rel="stylesheet" href="main_style.css">
+    <link rel="stylesheet" href="src/tangent_analysis.css">
+</head>
+
+<body>
+    <div class="card">
+        <a href="index.html" class="portal-btn">&#8592; Tools</a>
+        <h1>Tangent Analyzer</h1>
+        <p class="subtitle">Place draggable tangent lines on a curve and export their parameters and intersections</p>
+
+        <div class="main-row">
+            <!-- Left: plot + data table -->
+            <div class="panel panel-plot">
+                <h3>Curve</h3>
+
+                <div class="input-row">
+                    <div id="drop_zone">Drop a delimited X,Y file here, or click to choose</div>
+                    <input type="file" id="file-input" accept=".txt,.csv,.tsv,.dat" hidden>
+                </div>
+                <div class="input-row">
+                    <label for="delimiter-select">Delimiter</label>
+                    <select id="delimiter-select">
+                        <option value="auto">Auto-detect</option>
+                        <option value="\t">Tab</option>
+                        <option value=",">Comma</option>
+                        <option value=";">Semicolon</option>
+                        <option value="whitespace">Whitespace</option>
+                        <option value="custom">Custom…</option>
+                    </select>
+                    <input type="text" id="delimiter-custom" placeholder="delimiter char" size="4" hidden>
+                    <span id="curve-status">No data loaded</span>
+                </div>
+                <div class="input-row">
+                    <label>Display</label>
+                    <div class="mode-toggle">
+                        <button class="mode-btn active" data-mode="line">Line</button>
+                        <button class="mode-btn" data-mode="fill">Fill</button>
+                    </div>
+                    <label class="check-inline"><input type="checkbox" id="chk-color-by-index"> Color by position</label>
+                </div>
+
+                <canvas id="plot-canvas" height="420"></canvas>
+
+                <h3 style="margin-top:16px">Derivative (selected tangent)</h3>
+                <div id="derivative-empty" class="empty-note">Select a Point ± n tangent (click its card or drag its handle) to view its local derivative.</div>
+                <div id="derivative-content" hidden>
+                    <div class="input-row">
+                        <label>N = <input type="number" id="deriv-n-input" min="1" step="1"></label>
+                        <button class="btn" id="btn-save-derivative">Save derivative (CSV)</button>
+                    </div>
+                    <canvas id="derivative-canvas" height="100"></canvas>
+                </div>
+
+                <h3 style="margin-top:16px">Data (X, Y)</h3>
+                <div class="btn-row">
+                    <button class="btn" id="btn-add-row">+ Add Row</button>
+                    <button class="btn" id="btn-save-data">Save data (CSV)</button>
+                </div>
+                <div class="data-table-wrap">
+                    <div class="data-table-header">
+                        <div class="dt-col-idx">#</div>
+                        <div class="dt-col-x">X</div>
+                        <div class="dt-col-y">Y</div>
+                        <div class="dt-col-del"></div>
+                    </div>
+                    <div id="data-table-scroll">
+                        <div id="data-table-spacer">
+                            <div id="data-table-viewport"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: tangents + intersections -->
+            <div class="panel-side">
+                <div class="panel">
+                    <h3>Tangents</h3>
+                    <div class="btn-row">
+                        <select id="add-tangent-mode">
+                            <option value="point-window" selected>Point ± n</option>
+                            <option value="two-handle">2-Handle</option>
+                        </select>
+                        <button class="btn btn-primary" id="btn-add-tangent" disabled>+ Add Tangent</button>
+                    </div>
+                    <div class="btn-row">
+                        <button class="btn" id="btn-save-tangents">Save tangents (CSV)</button>
+                    </div>
+                    <ul class="tangent-list" id="tangent-list"></ul>
+                </div>
+
+                <div class="panel">
+                    <h3>Intersections</h3>
+                    <div class="btn-row">
+                        <button class="btn" id="btn-save-intersections">Save intersections (CSV)</button>
+                    </div>
+                    <div style="overflow-x:auto">
+                        <table class="results-table">
+                            <thead>
+                                <tr>
+                                    <th>A</th>
+                                    <th>B</th>
+                                    <th>X</th>
+                                    <th>Y</th>
+                                </tr>
+                            </thead>
+                            <tbody id="intersection-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="src/tangent_analysis.js"></script>
+</body>
+
+</html>

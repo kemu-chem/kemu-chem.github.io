@@ -44,6 +44,18 @@ Interactive visual identifier for common impurity peaks in NMR spectra.
 - **Dark mode**: Automatic OS preference detection with manual toggle
 - **Data source**: Fulmer, G. R. et al. *Organometallics* **2010**, *29* (9), 2176-2179. [DOI: 10.1021/om100106e](https://doi.org/10.1021/om100106e)
 
+### Tangent Analyzer
+
+Place draggable tangent lines on any X,Y curve and export their parameters and intersections.
+
+- **Input**: Drag-and-drop a delimited text file (comma/tab/semicolon/whitespace/custom, auto-detect by default) or type values directly into an editable data table. Both share the same underlying dataset.
+- **Encoding-aware**: Detects UTF-16LE/BE and UTF-8 byte-order marks before decoding, so raw instrument exports (e.g. Shimadzu TGA UTF-16 output) parse correctly alongside plain ASCII/CSV files.
+- **Tangent construction**: Two-handle line segments — drag either endpoint independently, with a per-handle toggle to snap its Y value to the loaded curve or leave it free.
+- **Multiple tangents**: Add any number of tangents; each is tracked with its own color, slope, intercept, and equation.
+- **Intersections**: All tangent pairs are intersected automatically and listed in a results table (parallel pairs are flagged, not silently dropped).
+- **Export**: Save data, tangents, and intersections as three separate CSV files.
+- **Use case**: Onset/bandgap-style analyses (e.g. baseline-tangent × edge-tangent intersection on UV-Vis, DSC/TGA, or CV curves) without leaving the browser.
+
 ## Design Principles
 
 - **Client-side only**: No data leaves the browser. Suitable for handling unpublished results and proprietary data.
@@ -59,7 +71,10 @@ bib2ref.html                # RefConverter
 SimpleTLCAnalysis.html      # TLC Analysis
 cell_counter.html           # Cell Counter
 NMRImpurityFinder.html      # NMR Impurity Finder
+TangentAnalyzer.html        # Tangent Analyzer
 main_style.css              # Shared styles
+src/tangent_analysis.js     # Tangent Analyzer logic
+src/tangent_analysis.css    # Tangent Analyzer styles
 data/json/hnmr/             # 1H NMR impurity shift data (JSON, per solvent)
 ```
 

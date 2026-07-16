@@ -1,0 +1,439 @@
+body {
+    max-width: 1200px;
+}
+
+h1 {
+    margin-top: 0;
+    color: #333;
+}
+
+.subtitle {
+    color: #777;
+    margin-bottom: 20px;
+}
+
+.main-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    align-items: flex-start;
+}
+
+.panel {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 16px;
+}
+
+.panel h3 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    color: #475569;
+}
+
+.panel-plot {
+    flex: 2;
+    min-width: 0;
+}
+
+.panel-side {
+    flex: 1;
+    min-width: 280px;
+    max-width: 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ---- Input row ---- */
+.input-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.input-row label {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.input-row select,
+.input-row input[type="text"] {
+    padding: 5px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    font-size: 12px;
+}
+
+#curve-status {
+    font-size: 12px;
+    color: #64748b;
+}
+
+/* ---- Curve display mode toggle ---- */
+.mode-toggle {
+    display: inline-flex;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.mode-btn {
+    padding: 4px 12px;
+    border: none;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.mode-btn.active {
+    background: var(--primary);
+    color: white;
+}
+
+.mode-btn:not(.active):hover {
+    background: #e2e8f0;
+}
+
+.check-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* ---- Canvas ---- */
+canvas {
+    display: block;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #fafbfc;
+}
+
+#plot-canvas {
+    width: 100%;
+    cursor: crosshair;
+    touch-action: none;
+}
+
+#derivative-canvas {
+    width: 100%;
+}
+
+/* ---- Buttons ---- */
+.btn-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.btn {
+    padding: 6px 14px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+}
+
+.btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.btn-primary:hover {
+    opacity: 0.9;
+}
+
+.btn-danger {
+    color: #dc2626;
+    border-color: #fca5a5;
+}
+
+.btn-danger:hover {
+    background: #fef2f2;
+}
+
+.btn-xs {
+    padding: 3px 8px;
+    font-size: 11px;
+    border: 1px solid #fca5a5;
+    background: #fff;
+    color: #dc2626;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-xs:hover {
+    background: #fef2f2;
+}
+
+/* ---- Data table (virtual scroll) ---- */
+.data-table-wrap {
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.data-table-header {
+    display: flex;
+    background: #f8fafc;
+    border-bottom: 2px solid #e2e8f0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+}
+
+.data-table-header>div {
+    padding: 6px 8px;
+}
+
+.dt-col-idx {
+    width: 44px;
+    flex-shrink: 0;
+}
+
+.dt-col-x,
+.dt-col-y {
+    flex: 1;
+}
+
+.dt-col-del {
+    width: 34px;
+    flex-shrink: 0;
+}
+
+#data-table-scroll {
+    height: 220px;
+    overflow-y: auto;
+    position: relative;
+}
+
+#data-table-spacer {
+    position: relative;
+    width: 100%;
+}
+
+#data-table-viewport {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+}
+
+.dt-row {
+    display: flex;
+    align-items: center;
+    height: 26px;
+    font-size: 12px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.dt-row:hover {
+    background: #f8fafc;
+}
+
+.dt-row .dt-col-idx {
+    color: #94a3b8;
+    font-variant-numeric: tabular-nums;
+    padding-left: 8px;
+}
+
+.dt-row input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 3px 6px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    box-sizing: border-box;
+}
+
+.dt-row input:focus {
+    outline: 1px solid var(--primary);
+    background: #eff6ff;
+}
+
+.dt-row .dt-col-del button {
+    border: none;
+    background: none;
+    color: #cbd5e1;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.dt-row .dt-col-del button:hover {
+    color: #dc2626;
+}
+
+/* ---- Tangent list ---- */
+.tangent-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tangent-item {
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.tangent-item.selected {
+    border-color: var(--primary);
+    background: #eff6ff;
+}
+
+.tangent-item-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.tangent-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.tangent-label-input {
+    font-weight: 600;
+    color: #334155;
+    flex: 1;
+    min-width: 0;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 12px;
+    font-family: inherit;
+}
+
+.tangent-label-input:hover {
+    border-color: #e2e8f0;
+}
+
+.tangent-label-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: #fff;
+}
+
+.tangent-point-info {
+    color: #94a3b8;
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+.tangent-eq {
+    color: #64748b;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 4px;
+}
+
+.tangent-snaps {
+    display: flex;
+    gap: 12px;
+    color: #64748b;
+    font-size: 11px;
+}
+
+.tangent-snaps label {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.tangent-mode-badge {
+    font-size: 10px;
+    font-weight: 600;
+    color: #64748b;
+    background: #f1f5f9;
+    border-radius: 4px;
+    padding: 2px 6px;
+    white-space: nowrap;
+}
+
+.tangent-window {
+    color: #64748b;
+    font-size: 11px;
+}
+
+.tangent-window input[type="number"] {
+    width: 56px;
+    padding: 2px 5px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.btn-row select {
+    padding: 5px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    font-size: 12px;
+}
+
+.empty-note {
+    color: #94a3b8;
+    font-size: 12px;
+    padding: 6px 0;
+}
+
+/* ---- Results table (intersections) ---- */
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.results-table th {
+    text-align: left;
+    padding: 6px 8px;
+    background: #f8fafc;
+    border-bottom: 2px solid #e2e8f0;
+    color: #475569;
+    font-weight: 600;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.results-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #f1f5f9;
+    font-variant-numeric: tabular-nums;
+}
+
+.results-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.badge-parallel {
+    color: #a16207;
+    font-size: 10px;
+}
