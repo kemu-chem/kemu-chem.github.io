@@ -8,7 +8,7 @@ let imageLoaded = false;
 let overlayMode = false;
 
 // Manual count modification state (Spatial coordinate-based for 100% reproducibility)
-let editMode = 'view'; // 'view' | 'add' | 'delete'
+let editMode = 'view'; // 'view' | 'add' | 'delete' | 'lasso'
 let distinguishManual = false;
 
 // Main pipeline manual edits: { added: [{x, y, radius, id}], deleted: [{x, y}] }
@@ -19,6 +19,10 @@ let condEdits = {};
 
 let _manualSeq = 0;
 let _lastAutoDetectedCells = [];
+
+// Lasso drag state
+let activeLassoPoints = []; // [{x, y}] in image pixel coordinates
+let activeLassoTarget = null; // 'main' | ruleId
 
 function getCondEdits(ruleId) {
     if (!condEdits[ruleId]) {
@@ -37,6 +41,103 @@ function findNearbyDeletedIndex(x, y, deletedList, tolerance) {
         if (Math.sqrt(dx * dx + dy * dy) <= tol) return i;
     }
     return -1;
+}
+
+// Ray-Casting Algorithm for Point-in-Polygon testing
+function pointInPolygon(x, y, poly) {
+    if (!poly || poly.length < 3) return false;
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const xi = poly[i].x, yi = poly[i].y;
+        const xj = poly[j].x, yj = poly[j].y;
+        const intersect = ((yi > y) !== (yj > y)) &&
+            (x < (xj - xi) * (y - yi) / (yj - yi + 1e-10) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+// Helper function for Lasso selection drag
+function setupCanvasLasso(canvasEl, targetId) {
+    if (!canvasEl) return;
+    let isMouseDown = false;
+
+    canvasEl.addEventListener("mousedown", e => {
+        if (editMode !== "lasso" || !imageLoaded) return;
+        isMouseDown = true;
+        activeLassoTarget = targetId;
+        const rect = canvasEl.getBoundingClientRect();
+        const scaleX = canvasEl.width / rect.width;
+        const scaleY = canvasEl.height / rect.height;
+        const imgX = Math.round((e.clientX - rect.left) * scaleX);
+        const imgY = Math.round((e.clientY - rect.top) * scaleY);
+        activeLassoPoints = [{ x: imgX, y: imgY }];
+    });
+
+    canvasEl.addEventListener("mousemove", e => {
+        if (!isMouseDown || editMode !== "lasso") return;
+        const rect = canvasEl.getBoundingClientRect();
+        const scaleX = canvasEl.width / rect.width;
+        const scaleY = canvasEl.height / rect.height;
+        const imgX = Math.round((e.clientX - rect.left) * scaleX);
+        const imgY = Math.round((e.clientY - rect.top) * scaleY);
+        activeLassoPoints.push({ x: imgX, y: imgY });
+
+        if (targetId === "main") processImage();
+        else _rerenderCondCanvas(targetId);
+    });
+
+    const finishLasso = () => {
+        if (!isMouseDown) return;
+        isMouseDown = false;
+
+        if (activeLassoPoints.length >= 3) {
+            const poly = activeLassoPoints;
+            if (targetId === "main") {
+                _lastAutoDetectedCells.forEach(c => {
+                    if (pointInPolygon(c.cx, c.cy, poly)) {
+                        if (findNearbyDeletedIndex(c.cx, c.cy, mainEdits.deleted, c.radius) === -1) {
+                            mainEdits.deleted.push({ x: c.cx, y: c.cy });
+                        }
+                    }
+                });
+                for (let i = mainEdits.added.length - 1; i >= 0; i--) {
+                    const c = mainEdits.added[i];
+                    if (pointInPolygon(c.x, c.y, poly)) {
+                        mainEdits.added.splice(i, 1);
+                    }
+                }
+            } else {
+                const ruleEdits = getCondEdits(targetId);
+                const cache = _condCache[targetId];
+                if (cache && cache.validCells) {
+                    cache.validCells.forEach(c => {
+                        if (pointInPolygon(c.cx, c.cy, poly)) {
+                            if (findNearbyDeletedIndex(c.cx, c.cy, ruleEdits.deleted, c.radius) === -1) {
+                                ruleEdits.deleted.push({ x: c.cx, y: c.cy });
+                            }
+                        }
+                    });
+                }
+                if (ruleEdits.added) {
+                    for (let i = ruleEdits.added.length - 1; i >= 0; i--) {
+                        const c = ruleEdits.added[i];
+                        if (pointInPolygon(c.x, c.y, poly)) {
+                            ruleEdits.added.splice(i, 1);
+                        }
+                    }
+                }
+            }
+        }
+
+        activeLassoPoints = [];
+        activeLassoTarget = null;
+        if (targetId === "main") processImage();
+        else _updateCondResults();
+    };
+
+    canvasEl.addEventListener("mouseup", finishLasso);
+    canvasEl.addEventListener("mouseleave", finishLasso);
 }
 
 // Cached binary channel masks (CV_8UC1) updated every processImage() call.
@@ -743,7 +844,19 @@ function _rerenderCondCanvas(ruleId) {
                 }
             }
         }
-        // ------------------------------------
+        // Draw active Lasso selection drag overlay
+        if (activeLassoTarget === ruleId && activeLassoPoints.length >= 2) {
+            for (let i = 1; i < activeLassoPoints.length; i++) {
+                cv.line(displayMat,
+                    new cv.Point(activeLassoPoints[i - 1].x, activeLassoPoints[i - 1].y),
+                    new cv.Point(activeLassoPoints[i].x, activeLassoPoints[i].y),
+                    new cv.Scalar(239, 68, 68, 255), 2);
+            }
+            cv.line(displayMat,
+                new cv.Point(activeLassoPoints[activeLassoPoints.length - 1].x, activeLassoPoints[activeLassoPoints.length - 1].y),
+                new cv.Point(activeLassoPoints[0].x, activeLassoPoints[0].y),
+                new cv.Scalar(239, 68, 68, 180), 1);
+        }
 
         cv.imshow(canvasId, displayMat);
     } finally {
@@ -856,12 +969,14 @@ function _updateCondResults() {
                     fmt, `cond_${expr.replace(/ /g, '_')}`);
             });
 
-            // Canvas click handler for per-rule manual edits
+            // Canvas click and lasso drag handler for per-rule manual edits
             const condCanvas = document.getElementById(`cond-canvas-${rule.id}`);
             if (condCanvas) {
-                if (editMode === 'add') condCanvas.style.cursor = 'crosshair';
+                if (editMode === 'add' || editMode === 'lasso') condCanvas.style.cursor = 'crosshair';
                 else if (editMode === 'delete') condCanvas.style.cursor = 'pointer';
                 else condCanvas.style.cursor = 'default';
+
+                setupCanvasLasso(condCanvas, rule.id);
 
                 condCanvas.addEventListener('click', e => {
                     if (editMode === 'view') return;
@@ -1155,6 +1270,20 @@ function processImage() {
             }
         }
 
+        // Draw active Lasso selection drag overlay
+        if (activeLassoTarget === 'main' && activeLassoPoints.length >= 2) {
+            for (let i = 1; i < activeLassoPoints.length; i++) {
+                cv.line(displayMat,
+                    new cv.Point(activeLassoPoints[i - 1].x, activeLassoPoints[i - 1].y),
+                    new cv.Point(activeLassoPoints[i].x, activeLassoPoints[i].y),
+                    new cv.Scalar(239, 68, 68, 255), 2);
+            }
+            cv.line(displayMat,
+                new cv.Point(activeLassoPoints[activeLassoPoints.length - 1].x, activeLassoPoints[activeLassoPoints.length - 1].y),
+                new cv.Point(activeLassoPoints[0].x, activeLassoPoints[0].y),
+                new cv.Scalar(239, 68, 68, 180), 1);
+        }
+
         cv.imshow('canvas-result', displayMat);
 
         // Re-adjust overlay height after repaint
@@ -1199,7 +1328,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const resCanvas = document.getElementById("canvas-result");
             if (resCanvas) {
-                if (editMode === "add") resCanvas.style.cursor = "crosshair";
+                if (editMode === "add" || editMode === "lasso") resCanvas.style.cursor = "crosshair";
                 else if (editMode === "delete") resCanvas.style.cursor = "pointer";
                 else resCanvas.style.cursor = "default";
             }
@@ -1228,8 +1357,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // Canvas click listener for Main Manual Add / Delete
     const resultCanvas = document.getElementById("canvas-result");
     if (resultCanvas) {
+        setupCanvasLasso(resultCanvas, "main");
+
         resultCanvas.addEventListener("click", e => {
-            if (editMode === "view" || !imageLoaded) return;
+            if (editMode === "view" || editMode === "lasso" || !imageLoaded) return;
 
             const rect = resultCanvas.getBoundingClientRect();
             if (!rect.width || !rect.height) return;
