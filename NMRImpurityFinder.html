@@ -1421,12 +1421,44 @@
                     document.getElementById('spectrumSvg')
                 );
                 NMRControls.init();
+
+                if (window.KemuConfig) {
+                    const solventSelect = document.getElementById('solventSelect');
+                    const searchInput = document.getElementById('searchInput');
+
+                    const getNMRState = () => ({
+                        solvent: solventSelect.value,
+                        search: searchInput.value
+                    });
+
+                    const loadNMRState = (state) => {
+                        if (!state) return;
+                        if (state.solvent) {
+                            solventSelect.value = state.solvent;
+                            solventSelect.dispatchEvent(new Event('change'));
+                        }
+                        if (state.search) {
+                            searchInput.value = state.search;
+                            searchInput.dispatchEvent(new Event('input'));
+                        }
+                    };
+
+                    KemuConfig.registerTool('nmr_impurity_finder', {
+                        getState: getNMRState,
+                        onLoad: loadNMRState
+                    });
+
+                    const notifyNMR = () => KemuConfig.updateToolState('nmr_impurity_finder', getNMRState());
+                    solventSelect.addEventListener('change', notifyNMR);
+                    searchInput.addEventListener('input', notifyNMR);
+                }
             });
         })();
     </script>
     <script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
         data-id="kemuchem" data-description="Support me on Buy me a coffee!" data-message="" data-color="#FF5F5F"
         data-position="Right" data-x_margin="18" data-y_margin="18"></script>
+    <script src="src/config_manager.js"></script>
     <script src="src/manual.js"></script>
     <script src="src/manual/nmr_impurity_finder.js"></script>
 </body>

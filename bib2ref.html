@@ -429,11 +429,64 @@
 
             // Wait for PyScript to initialize
             setTimeout(setupAutoConvert, 1000);
+
+            // Register KemuConfig for bib2ref state persistence
+            if (window.KemuConfig) {
+                const styleSelect = document.getElementById('style_select');
+                const sortSelect = document.getElementById('sort_select');
+                const maxNInput = document.getElementById('max_n_input');
+                const omitTitleCheck = document.getElementById('omit_title_check');
+                const reverseAuthorsCheck = document.getElementById('reverse_authors_check');
+                const abbrevJournalCheck = document.getElementById('abbrev_journal_check');
+                const showDoiCheck = document.getElementById('show_doi_check');
+                const bibInput = document.getElementById('bib_input');
+
+                const getBibState = () => ({
+                    style: styleSelect.value,
+                    sort: sortSelect.value,
+                    max_n: maxNInput.value,
+                    omit_title: omitTitleCheck.checked,
+                    reverse_authors: reverseAuthorsCheck.checked,
+                    abbrev_journal: abbrevJournalCheck.checked,
+                    show_doi: showDoiCheck.checked,
+                    input_text: bibInput.value
+                });
+
+                const loadBibState = (state) => {
+                    if (!state) return;
+                    if (state.style) styleSelect.value = state.style;
+                    if (state.sort) sortSelect.value = state.sort;
+                    if (state.max_n !== undefined) maxNInput.value = state.max_n;
+                    if (state.omit_title !== undefined) omitTitleCheck.checked = state.omit_title;
+                    if (state.reverse_authors !== undefined) reverseAuthorsCheck.checked = state.reverse_authors;
+                    if (state.abbrev_journal !== undefined) abbrevJournalCheck.checked = state.abbrev_journal;
+                    if (state.show_doi !== undefined) showDoiCheck.checked = state.show_doi;
+                    if (state.input_text !== undefined && !bibInput.value) bibInput.value = state.input_text;
+                    triggerConvert();
+                };
+
+                KemuConfig.registerTool('bib2ref', {
+                    getState: getBibState,
+                    onLoad: loadBibState
+                });
+
+                const notifyChange = () => {
+                    KemuConfig.updateToolState('bib2ref', getBibState());
+                };
+
+                [styleSelect, sortSelect, omitTitleCheck, reverseAuthorsCheck, abbrevJournalCheck, showDoiCheck].forEach(el => {
+                    el.addEventListener('change', notifyChange);
+                });
+                [maxNInput, bibInput].forEach(el => {
+                    el.addEventListener('input', notifyChange);
+                });
+            }
         });
     </script>
     <script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
         data-id="kemuchem" data-description="Support me on Buy me a coffee!" data-message="" data-color="#FF5F5F"
         data-position="Right" data-x_margin="18" data-y_margin="18"></script>
+    <script src="src/config_manager.js"></script>
     <script src="src/manual.js"></script>
     <script src="src/manual/bib2ref.js"></script>
 </body>

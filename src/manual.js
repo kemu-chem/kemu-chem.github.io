@@ -3,6 +3,18 @@
 
     var LANG_LABELS = { en: "English", ja: "日本語" };
     var STORAGE_KEY = "labtools_handbook_manual_lang";
+    var SECURITY_NOTE = {
+        en: "🔒 Everything you load into this tool (images, spectra, numbers, files) is processed entirely in your browser and is never uploaded to a server.",
+        ja: "🔒 このツールに読み込んだデータ(画像・スペクトル・数値・ファイル)はすべてブラウザ内で処理され、サーバーに送信されることはありません。"
+    };
+
+    function highlight(selector) {
+        var el = document.querySelector(selector);
+        if (!el) return;
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("manual-highlight");
+        setTimeout(function () { el.classList.remove("manual-highlight"); }, 2400);
+    }
 
     function pickInitialLang(available) {
         var saved = null;
@@ -49,7 +61,9 @@
         function render() {
             var entry = content[lang] || {};
             titleEl.textContent = entry.title || "";
-            bodyEl.innerHTML = entry.body || "";
+            var note = SECURITY_NOTE[lang] || SECURITY_NOTE.en;
+            bodyEl.innerHTML = (entry.body || "") +
+                '<div class="manual-security-note">' + note + "</div>";
             var buttons = langsEl.querySelectorAll("button");
             for (var i = 0; i < buttons.length; i++) {
                 var match = buttons[i].getAttribute("data-lang") === lang;
@@ -75,6 +89,14 @@
         closeBtn.addEventListener("click", function () { dialog.close(); });
         dialog.addEventListener("click", function (e) {
             if (e.target === dialog) dialog.close();
+        });
+        bodyEl.addEventListener("click", function (e) {
+            var trigger = e.target.closest && e.target.closest("[data-manual-target]");
+            if (!trigger) return;
+            e.preventDefault();
+            var selector = trigger.getAttribute("data-manual-target");
+            dialog.close();
+            highlight(selector);
         });
 
         render();

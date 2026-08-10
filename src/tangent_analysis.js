@@ -1186,4 +1186,58 @@
 
     // ======== Init ========
     renderAll();
+
+    // ======== KemuConfig Integration ========
+    if (window.KemuConfig) {
+        const getTangentState = () => ({
+            delimiter: state.delimiter,
+            customDelimiter: state.customDelimiter,
+            curveDisplayMode: state.curveDisplayMode,
+            colorByIndex: state.colorByIndex,
+            addTangentMode: document.getElementById("add-tangent-mode").value
+        });
+
+        const loadTangentState = (saved) => {
+            if (!saved) return;
+            if (saved.delimiter !== undefined) {
+                state.delimiter = saved.delimiter;
+                delimSelect.value = saved.delimiter;
+                delimCustom.hidden = saved.delimiter !== "custom";
+            }
+            if (saved.customDelimiter !== undefined) {
+                state.customDelimiter = saved.customDelimiter;
+                delimCustom.value = saved.customDelimiter;
+            }
+            if (saved.curveDisplayMode !== undefined) {
+                state.curveDisplayMode = saved.curveDisplayMode;
+                document.querySelectorAll(".mode-btn").forEach(b => {
+                    b.classList.toggle("active", b.dataset.mode === saved.curveDisplayMode);
+                });
+            }
+            if (saved.colorByIndex !== undefined) {
+                state.colorByIndex = saved.colorByIndex;
+                document.getElementById("chk-color-by-index").checked = saved.colorByIndex;
+            }
+            if (saved.addTangentMode !== undefined) {
+                document.getElementById("add-tangent-mode").value = saved.addTangentMode;
+            }
+            drawPlot();
+        };
+
+        KemuConfig.registerTool("tangent_analyzer", {
+            getState: getTangentState,
+            onLoad: loadTangentState
+        });
+
+        const notifyTangentState = () => {
+            KemuConfig.updateToolState("tangent_analyzer", getTangentState());
+        };
+
+        delimSelect.addEventListener("change", notifyTangentState);
+        delimCustom.addEventListener("input", notifyTangentState);
+        document.querySelectorAll(".mode-btn").forEach(btn => btn.addEventListener("click", notifyTangentState));
+        document.getElementById("chk-color-by-index").addEventListener("change", notifyTangentState);
+        document.getElementById("add-tangent-mode").addEventListener("change", notifyTangentState);
+    }
 })();
+

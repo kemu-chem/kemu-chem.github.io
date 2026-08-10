@@ -1,20 +1,95 @@
 :root {
     --primary: #2563eb;
+    --bg-color: #f8fafc;
+    --card-bg: #ffffff;
+    --text-color: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --input-bg: #ffffff;
+    --modal-bg: #ffffff;
+    --modal-header-bg: #f8fafc;
+}
+
+[data-theme="dark"] {
+    --bg-color: #0f172a;
+    --card-bg: #1e293b;
+    --text-color: #f8fafc;
+    --text-muted: #94a3b8;
+    --border-color: #334155;
+    --input-bg: #0f172a;
+    --modal-bg: #1e293b;
+    --modal-header-bg: #0f172a;
 }
 
 body {
-    font-family: sans-serif;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     max-width: 900px;
     margin: 20px auto;
     padding: 20px;
-    background: #f8fafc;
+    background: var(--bg-color);
+    color: var(--text-color);
+    transition: background-color 0.2s, color 0.2s;
 }
 
 .card {
-    background: white;
+    background: var(--card-bg);
+    color: var(--text-color);
     padding: 25px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border-color);
+}
+
+/* Dark Mode Input & Control Elements */
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+    background: var(--input-bg);
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .config-dialog,
+[data-theme="dark"] .manual-dialog {
+    background: var(--modal-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .config-header,
+[data-theme="dark"] .manual-header {
+    background: var(--modal-header-bg);
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .config-title,
+[data-theme="dark"] .manual-title,
+[data-theme="dark"] .config-section h3,
+[data-theme="dark"] .tool-title,
+[data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3 {
+    color: var(--text-color);
+}
+
+[data-theme="dark"] .config-close,
+[data-theme="dark"] .manual-close,
+[data-theme="dark"] .config-desc,
+[data-theme="dark"] .subtitle,
+[data-theme="dark"] .tool-desc {
+    color: var(--text-muted);
+}
+
+[data-theme="dark"] .tool-card {
+    background: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .panel,
+[data-theme="dark"] .panel-side {
+    background: var(--card-bg);
+    color: var(--text-color);
+    border-color: var(--border-color);
 }
 
 #drop_zone {
@@ -218,3 +293,197 @@ i {
 .manual-body ul {
     padding-left: 20px;
 }
+
+.manual-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin: 8px 0;
+    display: block;
+    border: 1px solid #e2e8f0;
+}
+
+.manual-body figure {
+    margin: 12px 0;
+}
+
+.manual-body figcaption {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 4px;
+}
+
+.manual-body button.manual-locate-btn {
+    font-size: 12px;
+    padding: 2px 10px;
+    margin-left: 4px;
+    border: 1px solid var(--primary);
+    border-radius: 12px;
+    background: white;
+    color: var(--primary);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.manual-body button.manual-locate-btn:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.manual-security-note {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px;
+    color: #64748b;
+}
+
+.manual-highlight {
+    outline: 3px solid var(--primary);
+    outline-offset: 3px;
+    border-radius: 6px;
+    animation: manual-pulse 0.8s ease-out 3;
+}
+
+@keyframes manual-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.55); }
+    70% { box-shadow: 0 0 0 14px rgba(37, 99, 235, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+/* Shared Config Modal (Settings & Persistence) */
+.config-fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    position: fixed;
+    left: 18px;
+    bottom: 92px; /* Positioned directly above .manual-fab (bottom: 18px + 64px + 10px spacing) */
+    background: #475569;
+    color: white;
+    border-radius: 32px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    z-index: 9999;
+    cursor: pointer;
+    border: none;
+    font-size: 26px;
+    transition: 0.25s;
+    transform: scale(1);
+}
+
+.config-fab:hover {
+    transform: scale(1.08);
+    background: #334155;
+}
+
+.config-dialog {
+    width: min(550px, 92vw);
+    max-height: 85vh;
+    border: none;
+    border-radius: 12px;
+    padding: 0;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.config-dialog::backdrop {
+    background: rgba(15, 23, 42, 0.5);
+}
+
+.config-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+
+.config-title {
+    font-size: 1.15em;
+    margin: 0;
+    color: #0f172a;
+}
+
+.config-close {
+    border: none;
+    background: transparent;
+    font-size: 22px;
+    cursor: pointer;
+    color: #64748b;
+}
+
+.config-body {
+    padding: 20px;
+    line-height: 1.5;
+    color: #334155;
+}
+
+.config-section {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.config-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.config-section h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 1em;
+    color: #1e293b;
+}
+
+.config-row {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.config-select {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: white;
+    font-size: 14px;
+}
+
+.config-desc {
+    font-size: 0.88em;
+    color: #64748b;
+    margin-bottom: 14px;
+}
+
+.config-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.config-btn {
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: 0.15s;
+}
+
+.config-btn-primary { background: var(--primary, #2563eb); color: white; }
+.config-btn-primary:hover { opacity: 0.9; }
+
+.config-btn-secondary { background: #e2e8f0; color: #334155; }
+.config-btn-secondary:hover { background: #cbd5e1; }
+
+.config-btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; }
+.config-btn-danger:hover { background: #fee2e2; }
