@@ -20,3 +20,4 @@ data/nmr-data.csv
 data/*.tif
 .overview
 tmp_tlc.js
+memo.txt

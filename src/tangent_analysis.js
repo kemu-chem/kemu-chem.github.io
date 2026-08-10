@@ -138,7 +138,9 @@
         drag: null,         // { tangentId, pointIndex }
         curveDisplayMode: "line",  // "line" | "fill"
         colorByIndex: false,
-        selectedTangentId: null
+        selectedTangentId: null,
+        view: null,         // { xMin, xMax, yMin, yMax } | null (null = auto-fit to data)
+        pan: null           // { startCx, startCy, startXMin, startXMax, startYMin, startYMax }
     };
 
     function activeObject() {
@@ -258,6 +260,7 @@
         state.activeIndex = 0;
         state.tangents = state.tangents.filter(t => t.plotObjectId === obj.id);
         if (!state.tangents.some(t => t.id === state.selectedTangentId)) state.selectedTangentId = null;
+        state.view = null; // new data range renders the old zoom/pan meaningless
         renderAll();
     }
 
@@ -382,17 +385,25 @@
         }
     }
 
+    function autoFitRange() {
+        const obj = activeObject();
+        const range = obj && obj.xyData.length > 0 ? dataRange(obj.xyData) : { xMin: 0, xMax: 1, yMin: 0, yMax: 1 };
+        const xPad = (range.xMax - range.xMin) * 0.04;
+        const yPad = (range.yMax - range.yMin) * 0.08;
+        return {
+            xMin: range.xMin - xPad, xMax: range.xMax + xPad,
+            yMin: range.yMin - yPad, yMax: range.yMax + yPad
+        };
+    }
+
+    // state.view overrides the auto-fit range once the user zooms/pans; it's cleared
+    // (back to auto-fit) when a new file loads or "Fit to data" is clicked.
     function layout() {
         const dpr = window.devicePixelRatio || 1;
         const pad = 44 * dpr;
         const padR = 16 * dpr;
         const W = canvas.width, H = canvas.height;
-        const obj = activeObject();
-        const range = obj && obj.xyData.length > 0 ? dataRange(obj.xyData) : { xMin: 0, xMax: 1, yMin: 0, yMax: 1 };
-        const xPad = (range.xMax - range.xMin) * 0.04;
-        const yPad = (range.yMax - range.yMin) * 0.08;
-        const xMin = range.xMin - xPad, xMax = range.xMax + xPad;
-        const yMin = range.yMin - yPad, yMax = range.yMax + yPad;
+        const { xMin, xMax, yMin, yMax } = state.view || autoFitRange();
         return {
             dpr, W, H, pad, padR,
             plotW: W - pad - padR,
@@ -622,25 +633,76 @@
             state.selectedTangentId = hit.tangentId;
             canvas.setPointerCapture(e.pointerId);
             renderAll();
+        } else if (activeObject()) {
+            // Empty-area drag pans the view; only meaningful once data is loaded.
+            state.pan = {
+                startCx: x, startCy: y,
+                startXMin: L.xMin, startXMax: L.xMax, startYMin: L.yMin, startYMax: L.yMax
+            };
+            canvas.setPointerCapture(e.pointerId);
         }
     });
 
     canvas.addEventListener("pointermove", e => {
-        if (!state.drag) return;
-        const L = layout();
         const canvasXY = canvasCoords(e);
-        const dataXY = canvasToData(L, canvasXY.x, canvasXY.y);
-        const t = state.tangents.find(tg => tg.id === state.drag.tangentId);
-        if (!t) return;
-        const point = t.points[state.drag.pointIndex];
-        const obj = state.plotObjects.find(o => o.id === t.plotObjectId);
-        TANGENT_MODES[t.mode].onDrag(point, { dataXY, canvasXY, obj, L });
-        renderAll();
+        if (state.drag) {
+            const L = layout();
+            const dataXY = canvasToData(L, canvasXY.x, canvasXY.y);
+            const t = state.tangents.find(tg => tg.id === state.drag.tangentId);
+            if (!t) return;
+            const point = t.points[state.drag.pointIndex];
+            const obj = state.plotObjects.find(o => o.id === t.plotObjectId);
+            TANGENT_MODES[t.mode].onDrag(point, { dataXY, canvasXY, obj, L });
+            renderAll();
+        } else if (state.pan) {
+            const p = state.pan;
+            const rangeX = p.startXMax - p.startXMin;
+            const rangeY = p.startYMax - p.startYMin;
+            // plotW/plotH don't change with pan (only the data range does), so reading
+            // them fresh here is safe even though layout() would otherwise reflect
+            // whatever view is currently set mid-gesture.
+            const L = layout();
+            const dxData = (canvasXY.x - p.startCx) / L.plotW * rangeX;
+            const dyData = (canvasXY.y - p.startCy) / L.plotH * rangeY;
+            state.view = {
+                xMin: p.startXMin - dxData, xMax: p.startXMax - dxData,
+                yMin: p.startYMin + dyData, yMax: p.startYMax + dyData
+            };
+            drawPlot();
+        }
     });
 
-    function endDrag() { state.drag = null; }
+    function endDrag() { state.drag = null; state.pan = null; }
     canvas.addEventListener("pointerup", endDrag);
     canvas.addEventListener("pointercancel", endDrag);
+
+    // Wheel-zoom stretches the X axis only (horizontal), centered on the cursor's data
+    // X position — Y stays as-is. This matches how the data is actually inspected here:
+    // the dense axis that needs resolving is X (wavelength/potential/time), and leaving Y
+    // untouched means zooming doesn't also rescale the curve's vertical shape underfoot.
+    // { passive: false } is required for preventDefault() to stop the page from scrolling.
+    const ZOOM_STEP = 0.85;
+    const MIN_RANGE_FRACTION = 0.001; // vs. the full auto-fit X range, so zoom can't collapse to nothing
+    canvas.addEventListener("wheel", e => {
+        if (!activeObject()) return;
+        e.preventDefault();
+        const L = layout();
+        const { x, y } = canvasCoords(e);
+        const data = canvasToData(L, x, y);
+        const factor = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+
+        const fit = autoFitRange();
+        const minXRange = (fit.xMax - fit.xMin) * MIN_RANGE_FRACTION;
+        const newXRange = (L.xMax - L.xMin) * factor;
+        if (newXRange < minXRange) return; // already at max zoom-in
+
+        const xRatio = (data.x - L.xMin) / (L.xMax - L.xMin);
+        state.view = {
+            xMin: data.x - xRatio * newXRange, xMax: data.x + (1 - xRatio) * newXRange,
+            yMin: L.yMin, yMax: L.yMax
+        };
+        drawPlot();
+    }, { passive: false });
 
     window.addEventListener("resize", () => drawPlot());
 
@@ -1037,6 +1099,10 @@
     });
     document.getElementById("chk-color-by-index").addEventListener("change", e => {
         state.colorByIndex = e.target.checked;
+        drawPlot();
+    });
+    document.getElementById("btn-fit-view").addEventListener("click", () => {
+        state.view = null;
         drawPlot();
     });
 

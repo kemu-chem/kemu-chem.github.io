@@ -107,6 +107,11 @@ h1 {
     gap: 4px;
 }
 
+.zoom-hint {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
 /* ---- Canvas ---- */
 canvas {
     display: block;
