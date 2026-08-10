@@ -682,3 +682,26 @@ h1 {
     display: block;
     margin-top: 4px;
 }
+
+/* Manual edit mode buttons */
+.edit-mode-btn.active {
+    background: var(--primary, #2563eb) !important;
+    color: white !important;
+    border-color: var(--primary, #2563eb) !important;
+}
+
+[data-theme="dark"] .manual-edit-panel {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] .edit-mode-btn {
+    background: #0f172a !important;
+    color: #f8fafc !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] .edit-mode-btn.active {
+    background: var(--primary, #2563eb) !important;
+    color: white !important;
+}

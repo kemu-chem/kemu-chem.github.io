@@ -7,6 +7,38 @@ let debounceTimer = null;
 let imageLoaded = false;
 let overlayMode = false;
 
+// Manual count modification state (Spatial coordinate-based for 100% reproducibility)
+let editMode = 'view'; // 'view' | 'add' | 'delete'
+let distinguishManual = false;
+
+// Main pipeline manual edits: { added: [{x, y, radius, id}], deleted: [{x, y}] }
+let mainEdits = { added: [], deleted: [] };
+
+// Per-condition rule manual edits: { [ruleId]: { added: [{x, y, radius, id}], deleted: [{x, y}] } }
+let condEdits = {};
+
+let _manualSeq = 0;
+let _lastAutoDetectedCells = [];
+
+function getCondEdits(ruleId) {
+    if (!condEdits[ruleId]) {
+        condEdits[ruleId] = { added: [], deleted: [] };
+    }
+    return condEdits[ruleId];
+}
+
+// Proximity matching helper using spatial Euclidean distance in image pixels
+function findNearbyDeletedIndex(x, y, deletedList, tolerance) {
+    const tol = tolerance || 6;
+    for (let i = 0; i < deletedList.length; i++) {
+        const d = deletedList[i];
+        const dx = d.x - x;
+        const dy = d.y - y;
+        if (Math.sqrt(dx * dx + dy * dy) <= tol) return i;
+    }
+    return -1;
+}
+
 // Cached binary channel masks (CV_8UC1) updated every processImage() call.
 // Keys: 'r' | 'g' | 'b'.  Values: cv.Mat (caller must NOT delete these).
 const _chBinMats = { r: null, g: null, b: null };
@@ -605,29 +637,78 @@ function _rerenderCondCanvas(ruleId) {
     canvasEl.width = _cachedSrc.cols;
     canvasEl.height = _cachedSrc.rows;
 
+    const ruleEdits = getCondEdits(ruleId);
+    const activeCells = [];
+    const deletedCells = [];
+
+    cache.validCells.forEach(cell => {
+        if (findNearbyDeletedIndex(cell.cx, cell.cy, ruleEdits.deleted, cell.radius) !== -1) {
+            deletedCells.push(cell);
+        } else {
+            activeCells.push(cell);
+        }
+    });
+
     let displayMat = null;
     try {
         if (rule.view === 'mask') {
             displayMat = new cv.Mat();
             cv.cvtColor(cache.binMat, displayMat, cv.COLOR_GRAY2RGBA);
-            cache.validCells.forEach(cell =>
+            activeCells.forEach(cell =>
                 cv.drawContours(displayMat, cache.contours, cell.index,
                     new cv.Scalar(255, 60, 60, 255), 2));
+            ruleEdits.added.forEach(cell => {
+                cv.circle(displayMat, new cv.Point(cell.x, cell.y), cell.radius || 8, new cv.Scalar(255, 165, 0, 255), 2);
+            });
         } else {
             displayMat = _cachedSrc.clone();
-            cache.validCells.forEach(cell => {
-                cv.circle(displayMat, new cv.Point(cell.cx, cell.cy),
-                    cell.radius, new cv.Scalar(0, 220, 80, 255), 2);
-                cv.circle(displayMat, new cv.Point(cell.cx, cell.cy),
-                    3, new cv.Scalar(255, 50, 50, 255), -1);
-            });
+
+            if (!distinguishManual) {
+                const allActive = [
+                    ...activeCells.map(c => ({ cx: c.cx, cy: c.cy, radius: c.radius })),
+                    ...ruleEdits.added.map(c => ({ cx: c.x, cy: c.y, radius: c.radius || 8 }))
+                ];
+                allActive.forEach(cell => {
+                    cv.circle(displayMat, new cv.Point(cell.cx, cell.cy), cell.radius, new cv.Scalar(0, 220, 80, 255), 2);
+                    cv.circle(displayMat, new cv.Point(cell.cx, cell.cy), 3, new cv.Scalar(255, 50, 50, 255), -1);
+                });
+                if (rule.showLabels) {
+                    allActive.forEach((cell, n) =>
+                        cv.putText(displayMat, String(n + 1),
+                            new cv.Point(cell.cx + cell.radius + 3, cell.cy - cell.radius - 3),
+                            cv.FONT_HERSHEY_SIMPLEX, 0.45, new cv.Scalar(255, 255, 0, 255), 1));
+                }
+            } else {
+                activeCells.forEach((cell, n) => {
+                    cv.circle(displayMat, new cv.Point(cell.cx, cell.cy), cell.radius, new cv.Scalar(0, 220, 80, 255), 2);
+                    cv.circle(displayMat, new cv.Point(cell.cx, cell.cy), 3, new cv.Scalar(255, 50, 50, 255), -1);
+                    if (rule.showLabels) {
+                        cv.putText(displayMat, String(n + 1),
+                            new cv.Point(cell.cx + cell.radius + 3, cell.cy - cell.radius - 3),
+                            cv.FONT_HERSHEY_SIMPLEX, 0.45, new cv.Scalar(255, 255, 0, 255), 1);
+                    }
+                });
+
+                ruleEdits.added.forEach((cell, idx) => {
+                    const r = cell.radius || 8;
+                    cv.circle(displayMat, new cv.Point(cell.x, cell.y), r, new cv.Scalar(255, 165, 0, 255), 2);
+                    cv.circle(displayMat, new cv.Point(cell.x, cell.y), 3, new cv.Scalar(255, 165, 0, 255), -1);
+                    if (rule.showLabels) {
+                        cv.putText(displayMat, `+${idx + 1}`,
+                            new cv.Point(cell.x + r + 3, cell.y - r - 3),
+                            cv.FONT_HERSHEY_SIMPLEX, 0.45, new cv.Scalar(255, 165, 0, 255), 1);
+                    }
+                });
+
+                deletedCells.forEach(cell => {
+                    const r = cell.radius;
+                    cv.circle(displayMat, new cv.Point(cell.cx, cell.cy), r, new cv.Scalar(239, 68, 68, 180), 1);
+                    cv.line(displayMat, new cv.Point(cell.cx - r, cell.cy - r), new cv.Point(cell.cx + r, cell.cy + r), new cv.Scalar(239, 68, 68, 255), 2);
+                    cv.line(displayMat, new cv.Point(cell.cx - r, cell.cy + r), new cv.Point(cell.cx + r, cell.cy - r), new cv.Scalar(239, 68, 68, 255), 2);
+                });
+            }
         }
-        if (rule.showLabels) {
-            cache.validCells.forEach((cell, n) =>
-                cv.putText(displayMat, String(n + 1),
-                    new cv.Point(cell.cx + cell.radius + 3, cell.cy - cell.radius - 3),
-                    cv.FONT_HERSHEY_SIMPLEX, 0.45, new cv.Scalar(255, 255, 0, 255), 1));
-        }
+
         // Blend original image overlay
         if (rule.overlayOpacity > 0) {
             const blended = new cv.Mat();
@@ -649,22 +730,15 @@ function _rerenderCondCanvas(ruleId) {
                     const pt1 = new cv.Point(padding, displayMat.rows - padding - barHeight);
                     const pt2 = new cv.Point(padding + scalePx, displayMat.rows - padding);
                     
-                    // Black outline slightly larger
                     cv.rectangle(displayMat, new cv.Point(pt1.x - 2, pt1.y - 2), new cv.Point(pt2.x + 2, pt2.y + 2), new cv.Scalar(0, 0, 0, 255), -1);
-                    // White fill
                     cv.rectangle(displayMat, pt1, pt2, new cv.Scalar(255, 255, 255, 255), -1);
                     
-                    // Text above bar
                     const textStr = scaleUm + " um";
                     const fontScale = Math.max(0.4, barHeight / 20.0);
                     const thickness = Math.max(1, Math.round(fontScale * 1.5));
-                    
-                    // Rough manual text offset
                     const textY = pt1.y - Math.max(4, Math.round(displayMat.rows * 0.01));
                     
-                    // Black outline text
                     cv.putText(displayMat, textStr, new cv.Point(padding, textY), cv.FONT_HERSHEY_SIMPLEX, fontScale, new cv.Scalar(0, 0, 0, 255), thickness + 2);
-                    // White inline text
                     cv.putText(displayMat, textStr, new cv.Point(padding, textY), cv.FONT_HERSHEY_SIMPLEX, fontScale, new cv.Scalar(255, 255, 255, 255), thickness);
                 }
             }
@@ -725,20 +799,33 @@ function _updateCondResults() {
             };
             composed = null;
 
-            const count = analysis.validCells.length;
+            const ruleEdits = getCondEdits(rule.id);
+            const activeAutoCells = analysis.validCells.filter(cell =>
+                findNearbyDeletedIndex(cell.cx, cell.cy, ruleEdits.deleted, cell.radius) === -1
+            );
+            const deletedAutoCells = analysis.validCells.filter(cell =>
+                findNearbyDeletedIndex(cell.cx, cell.cy, ruleEdits.deleted, cell.radius) !== -1
+            );
+
+            const totalCount = activeAutoCells.length + ruleEdits.added.length;
+            const countStr = distinguishManual && (ruleEdits.added.length > 0 || deletedAutoCells.length > 0)
+                ? `${totalCount} <span style="font-size:11px;font-weight:normal;color:#64748b;">(Auto: ${activeAutoCells.length}, +${ruleEdits.added.length}, -${deletedAutoCells.length})</span>`
+                : `${totalCount}`;
+
             const col = COND_COLORS[ridx % COND_COLORS.length];
             const expr = _ruleExpr(rule.terms);
 
             // Build/update inner HTML of the canvas wrap
             wrap.innerHTML = `
                 <div class="cond-inline-top">
-                    <span class="cond-inline-count" style="color:${col.count}">${count}</span>
+                    <span class="cond-inline-count" style="color:${col.count}">${countStr}</span>
                     <span class="cond-inline-label">cells</span>
                     <div class="cond-view-toggle">
                         <button class="cond-view-btn${rule.view === 'cells' ? ' active' : ''}" data-view="cells">Cells</button>
                         <button class="cond-view-btn${rule.view === 'mask' ? ' active' : ''}" data-view="mask" >Mask</button>
                     </div>
                     <label class="cond-label-toggle"><input type="checkbox" ${rule.showLabels ? 'checked' : ''}> Num</label>
+                    <button class="cond-reset-btn" style="padding:2px 6px;font-size:10px;border:1px solid #cbd5e1;border-radius:3px;background:white;cursor:pointer;color:#64748b;">🔄 Reset</button>
                     <div class="cond-overlay-ctrl">
                         <span class="cond-overlay-lbl">Orig</span>
                         <input type="range" class="cond-ovl-slider" min="0" max="100"
@@ -758,11 +845,76 @@ function _updateCondResults() {
                 _setCondLabels(rule.id, e.target.checked));
             wrap.querySelector('.cond-ovl-slider').addEventListener('input', e =>
                 _setCondOverlay(rule.id, e.target.value / 100));
+            wrap.querySelector('.cond-reset-btn').addEventListener('click', () => {
+                ruleEdits.added = [];
+                ruleEdits.deleted = [];
+                _updateCondResults();
+            });
             wrap.querySelector('.cond-save-btn').addEventListener('click', () => {
                 const fmt = wrap.querySelector('.cond-fmt-sel').value;
                 _saveCanvas(document.getElementById(`cond-canvas-${rule.id}`),
                     fmt, `cond_${expr.replace(/ /g, '_')}`);
             });
+
+            // Canvas click handler for per-rule manual edits
+            const condCanvas = document.getElementById(`cond-canvas-${rule.id}`);
+            if (condCanvas) {
+                if (editMode === 'add') condCanvas.style.cursor = 'crosshair';
+                else if (editMode === 'delete') condCanvas.style.cursor = 'pointer';
+                else condCanvas.style.cursor = 'default';
+
+                condCanvas.addEventListener('click', e => {
+                    if (editMode === 'view') return;
+                    const rect = condCanvas.getBoundingClientRect();
+                    if (!rect.width || !rect.height) return;
+                    const scaleX = condCanvas.width / rect.width;
+                    const scaleY = condCanvas.height / rect.height;
+                    const imgX = Math.round((e.clientX - rect.left) * scaleX);
+                    const imgY = Math.round((e.clientY - rect.top) * scaleY);
+
+                    if (editMode === 'add') {
+                        ruleEdits.added.push({ x: imgX, y: imgY, radius: 8, id: ++_manualSeq });
+                        _updateCondResults();
+                    } else if (editMode === 'delete') {
+                        // Check ruleEdits.added
+                        let foundIdx = -1;
+                        for (let i = ruleEdits.added.length - 1; i >= 0; i--) {
+                            const c = ruleEdits.added[i];
+                            const dx = c.x - imgX, dy = c.y - imgY;
+                            if (Math.sqrt(dx * dx + dy * dy) <= (c.radius || 8) + 6) {
+                                foundIdx = i;
+                                break;
+                            }
+                        }
+                        if (foundIdx !== -1) {
+                            ruleEdits.added.splice(foundIdx, 1);
+                            _updateCondResults();
+                            return;
+                        }
+
+                        // Check analysis.validCells
+                        let foundCell = null;
+                        for (let i = 0; i < analysis.validCells.length; i++) {
+                            const c = analysis.validCells[i];
+                            const dx = c.cx - imgX, dy = c.cy - imgY;
+                            if (Math.sqrt(dx * dx + dy * dy) <= c.radius + 6) {
+                                foundCell = c;
+                                break;
+                            }
+                        }
+
+                        if (foundCell) {
+                            const delIdx = findNearbyDeletedIndex(foundCell.cx, foundCell.cy, ruleEdits.deleted, foundCell.radius);
+                            if (delIdx !== -1) {
+                                ruleEdits.deleted.splice(delIdx, 1); // un-delete
+                            } else {
+                                ruleEdits.deleted.push({ x: foundCell.cx, y: foundCell.cy });
+                            }
+                            _updateCondResults();
+                        }
+                    }
+                });
+            }
 
         } catch (e) {
             console.warn('Conditional count error:', e);
@@ -925,25 +1077,82 @@ function processImage() {
             });
         }
 
+        _lastAutoDetectedCells = validCells;
+
+        // Spatial coordinate proximity check for deleted auto cells
+        const activeAutoCells = [];
+        const deletedAutoCells = [];
+
+        validCells.forEach(cell => {
+            if (findNearbyDeletedIndex(cell.cx, cell.cy, mainEdits.deleted, cell.radius) !== -1) {
+                deletedAutoCells.push(cell);
+            } else {
+                activeAutoCells.push(cell);
+            }
+        });
+
         // Build result canvas
         if (currentView === 'thresh') {
             displayMat = new cv.Mat();
             cv.cvtColor(binary, displayMat, cv.COLOR_GRAY2RGBA);
-            validCells.forEach(cell =>
+            activeAutoCells.forEach(cell =>
                 cv.drawContours(displayMat, contours, cell.index, new cv.Scalar(255, 60, 60, 255), 2));
+            mainEdits.added.forEach(cell => {
+                cv.circle(displayMat, new cv.Point(cell.x, cell.y), cell.radius || 8, new cv.Scalar(255, 165, 0, 255), 2);
+            });
         } else {
             displayMat = src.clone();
-            validCells.forEach(cell => {
-                cv.circle(displayMat, new cv.Point(cell.cx, cell.cy), cell.radius, new cv.Scalar(0, 220, 80, 255), 2);
-                cv.circle(displayMat, new cv.Point(cell.cx, cell.cy), 3, new cv.Scalar(255, 50, 50, 255), -1);
-            });
-        }
 
-        if (showLabels) {
-            validCells.forEach((cell, n) =>
-                cv.putText(displayMat, String(n + 1),
-                    new cv.Point(cell.cx + cell.radius + 3, cell.cy - cell.radius - 3),
-                    cv.FONT_HERSHEY_SIMPLEX, 0.45, new cv.Scalar(255, 255, 0, 255), 1));
+            if (!distinguishManual) {
+                // Standard mode: no distinction (all active cells look identical)
+                const allActive = [
+                    ...activeAutoCells.map(c => ({ cx: c.cx, cy: c.cy, radius: c.radius })),
+                    ...mainEdits.added.map(c => ({ cx: c.x, cy: c.y, radius: c.radius || 8 }))
+                ];
+
+                allActive.forEach(cell => {
+                    cv.circle(displayMat, new cv.Point(cell.cx, cell.cy), cell.radius, new cv.Scalar(0, 220, 80, 255), 2);
+                    cv.circle(displayMat, new cv.Point(cell.cx, cell.cy), 3, new cv.Scalar(255, 50, 50, 255), -1);
+                });
+
+                if (showLabels) {
+                    allActive.forEach((cell, n) =>
+                        cv.putText(displayMat, String(n + 1),
+                            new cv.Point(cell.cx + cell.radius + 3, cell.cy - cell.radius - 3),
+                            cv.FONT_HERSHEY_SIMPLEX, 0.45, new cv.Scalar(255, 255, 0, 255), 1));
+                }
+            } else {
+                // Distinguish mode: highlight manual additions in orange and deleted cells in red
+                activeAutoCells.forEach((cell, n) => {
+                    cv.circle(displayMat, new cv.Point(cell.cx, cell.cy), cell.radius, new cv.Scalar(0, 220, 80, 255), 2);
+                    cv.circle(displayMat, new cv.Point(cell.cx, cell.cy), 3, new cv.Scalar(255, 50, 50, 255), -1);
+                    if (showLabels) {
+                        cv.putText(displayMat, String(n + 1),
+                            new cv.Point(cell.cx + cell.radius + 3, cell.cy - cell.radius - 3),
+                            cv.FONT_HERSHEY_SIMPLEX, 0.45, new cv.Scalar(255, 255, 0, 255), 1);
+                    }
+                });
+
+                // Manual additions in Orange
+                mainEdits.added.forEach((cell, idx) => {
+                    const r = cell.radius || 8;
+                    cv.circle(displayMat, new cv.Point(cell.x, cell.y), r, new cv.Scalar(255, 165, 0, 255), 2);
+                    cv.circle(displayMat, new cv.Point(cell.x, cell.y), 3, new cv.Scalar(255, 165, 0, 255), -1);
+                    if (showLabels) {
+                        cv.putText(displayMat, `+${idx + 1}`,
+                            new cv.Point(cell.x + r + 3, cell.y - r - 3),
+                            cv.FONT_HERSHEY_SIMPLEX, 0.45, new cv.Scalar(255, 165, 0, 255), 1);
+                    }
+                });
+
+                // Deleted auto cells in Red cross mark
+                deletedAutoCells.forEach(cell => {
+                    const r = cell.radius;
+                    cv.circle(displayMat, new cv.Point(cell.cx, cell.cy), r, new cv.Scalar(239, 68, 68, 180), 1);
+                    cv.line(displayMat, new cv.Point(cell.cx - r, cell.cy - r), new cv.Point(cell.cx + r, cell.cy + r), new cv.Scalar(239, 68, 68, 255), 2);
+                    cv.line(displayMat, new cv.Point(cell.cx - r, cell.cy + r), new cv.Point(cell.cx + r, cell.cy - r), new cv.Scalar(239, 68, 68, 255), 2);
+                });
+            }
         }
 
         cv.imshow('canvas-result', displayMat);
@@ -954,7 +1163,12 @@ function processImage() {
                 document.getElementById('canvas-row1').offsetHeight + 'px';
         }
 
-        document.getElementById('result-count').textContent = validCells.length;
+        const totalCount = activeAutoCells.length + mainEdits.added.length;
+        const countDisplay = distinguishManual
+            ? `${totalCount} (Auto: ${activeAutoCells.length}, +${mainEdits.added.length} manual, -${deletedAutoCells.length} deleted)`
+            : `${totalCount}`;
+
+        document.getElementById('result-count').textContent = countDisplay;
         document.getElementById('result-note').textContent =
             `${contours.size()} total contours; ${contours.size() - validCells.length} filtered out`;
 
@@ -973,3 +1187,131 @@ function processImage() {
         // they persist across calls for use by _updateCondResults().
     }
 }
+
+// ── Manual Edit Event Handling ───────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+    // Mode switcher buttons
+    document.querySelectorAll(".edit-mode-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".edit-mode-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            editMode = btn.dataset.editMode;
+
+            const resCanvas = document.getElementById("canvas-result");
+            if (resCanvas) {
+                if (editMode === "add") resCanvas.style.cursor = "crosshair";
+                else if (editMode === "delete") resCanvas.style.cursor = "pointer";
+                else resCanvas.style.cursor = "default";
+            }
+        });
+    });
+
+    // Distinguish checkbox
+    const chkDist = document.getElementById("distinguish-manual");
+    if (chkDist) {
+        chkDist.addEventListener("change", e => {
+            distinguishManual = e.target.checked;
+            if (imageLoaded) processImage();
+        });
+    }
+
+    // Reset button
+    const btnReset = document.getElementById("reset-manual-btn");
+    if (btnReset) {
+        btnReset.addEventListener("click", () => {
+            if (mainEdits.added.length === 0 && mainEdits.deleted.length === 0) return;
+            mainEdits = { added: [], deleted: [] };
+            if (imageLoaded) processImage();
+        });
+    }
+
+    // Canvas click listener for Main Manual Add / Delete
+    const resultCanvas = document.getElementById("canvas-result");
+    if (resultCanvas) {
+        resultCanvas.addEventListener("click", e => {
+            if (editMode === "view" || !imageLoaded) return;
+
+            const rect = resultCanvas.getBoundingClientRect();
+            if (!rect.width || !rect.height) return;
+            const scaleX = resultCanvas.width / rect.width;
+            const scaleY = resultCanvas.height / rect.height;
+            const imgX = Math.round((e.clientX - rect.left) * scaleX);
+            const imgY = Math.round((e.clientY - rect.top) * scaleY);
+
+            if (editMode === "add") {
+                mainEdits.added.push({
+                    x: imgX,
+                    y: imgY,
+                    radius: 8,
+                    id: ++_manualSeq
+                });
+                processImage();
+            } else if (editMode === "delete") {
+                // Check mainEdits.added
+                let foundManualIdx = -1;
+                for (let i = mainEdits.added.length - 1; i >= 0; i--) {
+                    const c = mainEdits.added[i];
+                    const dx = c.x - imgX, dy = c.y - imgY;
+                    if (Math.sqrt(dx * dx + dy * dy) <= (c.radius || 8) + 6) {
+                        foundManualIdx = i;
+                        break;
+                    }
+                }
+
+                if (foundManualIdx !== -1) {
+                    mainEdits.added.splice(foundManualIdx, 1);
+                    processImage();
+                    return;
+                }
+
+                // Check _lastAutoDetectedCells
+                let foundAutoCell = null;
+                for (let i = 0; i < _lastAutoDetectedCells.length; i++) {
+                    const c = _lastAutoDetectedCells[i];
+                    const dx = c.cx - imgX, dy = c.cy - imgY;
+                    if (Math.sqrt(dx * dx + dy * dy) <= c.radius + 6) {
+                        foundAutoCell = c;
+                        break;
+                    }
+                }
+
+                if (foundAutoCell) {
+                    const delIdx = findNearbyDeletedIndex(foundAutoCell.cx, foundAutoCell.cy, mainEdits.deleted, foundAutoCell.radius);
+                    if (delIdx !== -1) {
+                        mainEdits.deleted.splice(delIdx, 1); // un-delete
+                    } else {
+                        mainEdits.deleted.push({ x: foundAutoCell.cx, y: foundAutoCell.cy });
+                    }
+                    processImage();
+                }
+            }
+        });
+    }
+
+    // Register state lifecycle with ToolsHandbookConfig for 100% reproducible JSON persistence
+    const configManager = window.ToolsHandbookConfig || window.KemuConfig;
+    if (configManager) {
+        configManager.registerTool("cell_counter", {
+            getState: function () {
+                return {
+                    distinguishManual: distinguishManual,
+                    mainEdits: mainEdits,
+                    condEdits: condEdits
+                };
+            },
+            onLoad: function (saved) {
+                if (saved) {
+                    if (typeof saved.distinguishManual === "boolean") {
+                        distinguishManual = saved.distinguishManual;
+                        const chkDist = document.getElementById("distinguish-manual");
+                        if (chkDist) chkDist.checked = distinguishManual;
+                    }
+                    if (saved.mainEdits) mainEdits = saved.mainEdits;
+                    if (saved.condEdits) condEdits = saved.condEdits;
+                    if (imageLoaded) processImage();
+                }
+            }
+        });
+    }
+});
+

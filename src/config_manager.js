@@ -1,9 +1,10 @@
 (function () {
     "use strict";
 
-    var STORAGE_KEY = "kemu_handbook_config";
+    var STORAGE_KEY = "tools_handbook_config";
+    var OLD_STORAGE_KEY = "kemu_handbook_config";
     var SCHEMA_VERSION = "1.0.0";
-    var APP_ID = "kemu_handbook";
+    var APP_ID = "tools_handbook";
 
     var registry = {};
     var saveTimer = null;
@@ -25,17 +26,18 @@
 
     function loadFromStorage() {
         try {
-            var raw = localStorage.getItem(STORAGE_KEY);
+            var raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(OLD_STORAGE_KEY);
             if (!raw) return JSON.parse(JSON.stringify(defaultConfig));
             var parsed = JSON.parse(raw);
-            if (parsed && parsed.meta && parsed.meta.app === APP_ID) {
+            if (parsed && parsed.meta && (parsed.meta.app === APP_ID || parsed.meta.app === "kemu_handbook")) {
                 return Object.assign({}, defaultConfig, parsed, {
+                    meta: Object.assign({}, defaultConfig.meta, { app: APP_ID }),
                     global: Object.assign({}, defaultConfig.global, parsed.global || {}),
                     tools: Object.assign({}, defaultConfig.tools, parsed.tools || {})
                 });
             }
         } catch (e) {
-            console.warn("[KemuConfig] Failed to load config from storage:", e);
+            console.warn("[ToolsHandbookConfig] Failed to load config from storage:", e);
         }
         return JSON.parse(JSON.stringify(defaultConfig));
     }
@@ -53,7 +55,7 @@
             currentConfig.meta.exported_at = new Date().toISOString();
             localStorage.setItem(STORAGE_KEY, JSON.stringify(currentConfig));
         } catch (e) {
-            console.error("[KemuConfig] Failed to save config to storage:", e);
+            console.error("[ToolsHandbookConfig] Failed to save config to storage:", e);
         }
     }
 
@@ -107,11 +109,12 @@
         reader.onload = function (e) {
             try {
                 var parsed = JSON.parse(e.target.result);
-                if (!parsed || !parsed.meta || parsed.meta.app !== APP_ID) {
-                    alert("Invalid configuration file. Please select a valid Kemu Handbook config JSON file.");
+                if (!parsed || !parsed.meta || (parsed.meta.app !== APP_ID && parsed.meta.app !== "kemu_handbook")) {
+                    alert("Invalid configuration file. Please select a valid Tools Handbook config JSON file.");
                     return;
                 }
                 currentConfig = Object.assign({}, defaultConfig, parsed, {
+                    meta: Object.assign({}, defaultConfig.meta, { app: APP_ID }),
                     global: Object.assign({}, defaultConfig.global, parsed.global || {}),
                     tools: Object.assign({}, defaultConfig.tools, parsed.tools || {})
                 });
@@ -138,6 +141,7 @@
         if (!confirm("Are you sure you want to reset all cached state and settings to default?")) return;
         try {
             localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(OLD_STORAGE_KEY);
         } catch (e) { }
         currentConfig = JSON.parse(JSON.stringify(defaultConfig));
 
@@ -152,8 +156,8 @@
 
     function openDialog() {
         if (!activeDialogEl) return;
-        var themeSelect = activeDialogEl.querySelector("#kemu-config-theme");
-        var autosaveCheck = activeDialogEl.querySelector("#kemu-config-autosave");
+        var themeSelect = activeDialogEl.querySelector("#th-config-theme");
+        var autosaveCheck = activeDialogEl.querySelector("#th-config-autosave");
         if (themeSelect) themeSelect.value = currentConfig.global.theme || "auto";
         if (autosaveCheck) autosaveCheck.checked = currentConfig.global.auto_save !== false;
         activeDialogEl.showModal();
@@ -187,26 +191,26 @@
             '<div class="config-section">' +
             '<h3>General Settings</h3>' +
             '<div class="config-row">' +
-            '<label for="kemu-config-theme">Theme:</label>' +
-            '<select id="kemu-config-theme" class="config-select">' +
+            '<label for="th-config-theme">Theme:</label>' +
+            '<select id="th-config-theme" class="config-select">' +
             '<option value="auto">Auto (System preference)</option>' +
             '<option value="light">Light Mode</option>' +
             '<option value="dark">Dark Mode</option>' +
             '</select>' +
             '</div>' +
             '<div class="config-row">' +
-            '<label><input type="checkbox" id="kemu-config-autosave"> Auto-save input parameters to cache</label>' +
+            '<label><input type="checkbox" id="th-config-autosave"> Auto-save input parameters to cache</label>' +
             '</div>' +
             '</div>' +
             '<div class="config-section">' +
             '<h3>Import & Export (JSON)</h3>' +
             '<p class="config-desc">Save or restore your input parameters and options as a configuration JSON file (excluding binary images or raw datasets).</p>' +
             '<div class="config-actions">' +
-            '<button type="button" id="kemu-config-export" class="config-btn config-btn-primary">💾 Export JSON</button>' +
+            '<button type="button" id="th-config-export" class="config-btn config-btn-primary">💾 Export JSON</button>' +
             '<label class="config-btn config-btn-secondary">📁 Import JSON' +
-            '<input type="file" id="kemu-config-import" accept=".json" style="display:none;">' +
+            '<input type="file" id="th-config-import" accept=".json" style="display:none;">' +
             '</label>' +
-            '<button type="button" id="kemu-config-reset" class="config-btn config-btn-danger">🔄 Reset to Default</button>' +
+            '<button type="button" id="th-config-reset" class="config-btn config-btn-danger">🔄 Reset to Default</button>' +
             '</div>' +
             '</div>' +
             '</div>';
@@ -216,11 +220,11 @@
         activeDialogEl = dialog;
 
         var closeBtn = dialog.querySelector(".config-close");
-        var themeSelect = dialog.querySelector("#kemu-config-theme");
-        var autosaveCheck = dialog.querySelector("#kemu-config-autosave");
-        var exportBtn = dialog.querySelector("#kemu-config-export");
-        var importInput = dialog.querySelector("#kemu-config-import");
-        var resetBtn = dialog.querySelector("#kemu-config-reset");
+        var themeSelect = dialog.querySelector("#th-config-theme");
+        var autosaveCheck = dialog.querySelector("#th-config-autosave");
+        var exportBtn = dialog.querySelector("#th-config-export");
+        var importInput = dialog.querySelector("#th-config-import");
+        var resetBtn = dialog.querySelector("#th-config-reset");
 
         themeSelect.value = currentConfig.global.theme || "auto";
         autosaveCheck.checked = currentConfig.global.auto_save !== false;
@@ -269,8 +273,8 @@
         applyGlobalTheme(currentConfig.global.theme);
     }
 
-    // Public API
-    window.KemuConfig = {
+    // Public API - ToolsHandbookConfig (with aliases for backwards compatibility)
+    var ConfigManager = {
         registerTool: function (toolId, options) {
             registry[toolId] = options || {};
             var savedState = currentConfig.tools[toolId] || null;
@@ -278,7 +282,7 @@
                 try {
                     options.onLoad(savedState);
                 } catch (e) {
-                    console.error("[KemuConfig] Error loading state for tool " + toolId + ":", e);
+                    console.error("[ToolsHandbookConfig] Error loading state for tool " + toolId + ":", e);
                 }
             }
             return savedState;
@@ -299,6 +303,10 @@
         importJSON: importJSON,
         resetAllState: resetAllState
     };
+
+    window.ToolsHandbookConfig = ConfigManager;
+    window.ToolsConfig = ConfigManager;
+    window.KemuConfig = ConfigManager; // Alias for backwards compatibility
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", buildUI);

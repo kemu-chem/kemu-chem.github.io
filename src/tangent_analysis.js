@@ -1187,8 +1187,9 @@
     // ======== Init ========
     renderAll();
 
-    // ======== KemuConfig Integration ========
-    if (window.KemuConfig) {
+    // ======== ToolsHandbookConfig Integration ========
+    const configManager = window.ToolsHandbookConfig || window.KemuConfig;
+    if (configManager) {
         const getTangentState = () => ({
             delimiter: state.delimiter,
             customDelimiter: state.customDelimiter,
@@ -1224,13 +1225,13 @@
             drawPlot();
         };
 
-        KemuConfig.registerTool("tangent_analyzer", {
+        configManager.registerTool("tangent_analyzer", {
             getState: getTangentState,
             onLoad: loadTangentState
         });
 
         const notifyTangentState = () => {
-            KemuConfig.updateToolState("tangent_analyzer", getTangentState());
+            configManager.updateToolState("tangent_analyzer", getTangentState());
         };
 
         delimSelect.addEventListener("change", notifyTangentState);

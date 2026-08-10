@@ -1422,7 +1422,8 @@
                 );
                 NMRControls.init();
 
-                if (window.KemuConfig) {
+                const configManager = window.ToolsHandbookConfig || window.KemuConfig;
+                if (configManager) {
                     const solventSelect = document.getElementById('solventSelect');
                     const searchInput = document.getElementById('searchInput');
 
@@ -1443,12 +1444,12 @@
                         }
                     };
 
-                    KemuConfig.registerTool('nmr_impurity_finder', {
+                    configManager.registerTool('nmr_impurity_finder', {
                         getState: getNMRState,
                         onLoad: loadNMRState
                     });
 
-                    const notifyNMR = () => KemuConfig.updateToolState('nmr_impurity_finder', getNMRState());
+                    const notifyNMR = () => configManager.updateToolState('nmr_impurity_finder', getNMRState());
                     solventSelect.addEventListener('change', notifyNMR);
                     searchInput.addEventListener('input', notifyNMR);
                 }

@@ -430,8 +430,9 @@
             // Wait for PyScript to initialize
             setTimeout(setupAutoConvert, 1000);
 
-            // Register KemuConfig for bib2ref state persistence
-            if (window.KemuConfig) {
+            // Register ToolsHandbookConfig for bib2ref state persistence
+            const configManager = window.ToolsHandbookConfig || window.KemuConfig;
+            if (configManager) {
                 const styleSelect = document.getElementById('style_select');
                 const sortSelect = document.getElementById('sort_select');
                 const maxNInput = document.getElementById('max_n_input');
@@ -465,13 +466,13 @@
                     triggerConvert();
                 };
 
-                KemuConfig.registerTool('bib2ref', {
+                configManager.registerTool('bib2ref', {
                     getState: getBibState,
                     onLoad: loadBibState
                 });
 
                 const notifyChange = () => {
-                    KemuConfig.updateToolState('bib2ref', getBibState());
+                    configManager.updateToolState('bib2ref', getBibState());
                 };
 
                 [styleSelect, sortSelect, omitTitleCheck, reverseAuthorsCheck, abbrevJournalCheck, showDoiCheck].forEach(el => {
