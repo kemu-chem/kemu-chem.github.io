@@ -131,6 +131,7 @@ function renderMultiEdgePanel(edges, updateFn) {
     <h3 style="${H3}">${edges.length} Edges Selected</h3>
     ${field('Routing', radioGroup('routing', '', [['orthogonal', 'Orthogonal'], ['diagonal', 'Diagonal']]))}
     ${field('Line Type', radioGroup('lineType', '', [['normal', 'Solid'], ['dashed', 'Dashed']]))}
+    ${field('Color',     colorEl('edge-color', '#000000'))}
     ${field('Thickness', numberEl('thickness', '', 1, 6))}
     ${field('Head Size', numberEl('headSize', '', 4, 20))}
     ${SEP}Coil Arrow</span></div>
@@ -153,7 +154,7 @@ function renderMultiEdgePanel(edges, updateFn) {
         </div>`)}
       ${field('Style', boldItalicBtns(allBold ? 'bold' : 'normal', allItal ? 'italic' : 'normal'))}
       ${field('Show Arrow', selectEl('annot-showArrow', '', [['', '(No change)'], ['true', 'Show'], ['false', 'Hide']]))}
-      ${field('Arrow Color', colorEl('annot-arrowColor', '#555555'))}
+      ${field('Arrow Color', colorEl('annot-arrowColor', '#000000'))}
       ${field('Arrow Thickness', numberEl('annot-arrowThickness', '', 0.5, 6, 0.5))}
       ${field('Arrow Head', numberEl('annot-arrowHeadSize', '', 2, 20))}
       ${field('Arrow Gap', numberEl('annot-arrowGap', '', 0, 40))}
@@ -162,6 +163,7 @@ function renderMultiEdgePanel(edges, updateFn) {
   `;
   bindRadio('routing', v => updateFn(ids, { routing: v }));
   bindRadio('lineType', v => updateFn(ids, { arrowStyle: { type: v } }));
+  bind('input[name="edge-color"]', 'input', v => updateFn(ids, { arrowStyle: { color: v } }));
   bind('input[name="thickness"]', 'input', v => { if (v) updateFn(ids, { arrowStyle: { thickness: Number(v) } }); });
   bind('input[name="headSize"]', 'input', v => { if (v) updateFn(ids, { arrowStyle: { headSize: Number(v) } }); });
   bind('input[name="multi-coil"]', 'change', v => updateFn(ids, { annotations: { coil: v === 'true' } }), true);
@@ -201,7 +203,7 @@ function renderAnnotPanel(item, updateFn, tStep) {
     ${field('Distance', numberEl('a-dist', item.dist ?? 40, 10, 200))}
     ${field('Show Arrow',       checkboxEl('a-arrow',         item.showArrow      ?? true))}
     ${field('Arrow Gap',        numberEl('a-gap',             item.arrowGap       ?? 2, 0, 40))}
-    ${field('Arrow Color',      colorEl('a-arrowColor',       item.arrowColor     ?? '#555555'))}
+    ${field('Arrow Color',      colorEl('a-arrowColor',       item.arrowColor     ?? '#000000'))}
     ${field('Arrow Thickness',  numberEl('a-arrowThickness',  item.arrowThickness ?? 1.5, 0.5, 6, 0.5))}
     ${field('Arrow Head',       numberEl('a-arrowHeadSize',   item.arrowHeadSize  ?? 6, 2, 20))}
     ${field('Font Size', `
@@ -211,7 +213,7 @@ function renderAnnotPanel(item, updateFn, tStep) {
           <input type="checkbox" name="annot-auto-scale" style="cursor:pointer;"> Auto-adjust
         </label>
       </div>`)}
-    ${field('Text Color',  colorEl('a-color', item.color ?? '#444444'))}
+    ${field('Text Color',  colorEl('a-color', item.color ?? '#000000'))}
     ${field('Style', boldItalicBtns(item.fontWeight, item.fontStyle))}
   `;
   const labelEl = panelEl.querySelector('textarea[name="a-label"]');
@@ -263,6 +265,7 @@ function renderEdgePanel(edge, updateFn, tStep, defaults = null) {
     ` : ''}
     ${field('Routing', radioGroup('routing', edge.routing, [['orthogonal', 'Orthogonal'], ['diagonal', 'Diagonal']]))}
     ${field('Line Type', radioGroup('lineType', edge.arrowStyle.type, [['normal', 'Solid'], ['dashed', 'Dashed']]))}
+    ${field('Color',     colorEl('edge-color', edge.arrowStyle.color ?? '#000000'))}
     ${field('Thickness', numberEl('thickness', edge.arrowStyle.thickness, 1, 6))}
     ${field('Head Size', numberEl('headSize', edge.arrowStyle.headSize, 4, 20))}
 
@@ -272,7 +275,7 @@ function renderEdgePanel(edge, updateFn, tStep, defaults = null) {
       <div id="annot-batch" style="border:1px solid #bfdbfe;border-radius:6px;padding:8px;margin-bottom:12px;background:#f8fafc;">
         <div style="font-size:11px;font-weight:600;color:#2563eb;letter-spacing:.04em;margin-bottom:8px;">Apply to All</div>
         ${field('Show Arrow',      selectEl('batch-showArrow',     '', [['', '(No change)'], ['true', 'Show'], ['false', 'Hide']]))}
-        ${field('Arrow Color',     colorEl('batch-arrowColor',     '#555555'))}
+        ${field('Arrow Color',     colorEl('batch-arrowColor',     '#000000'))}
         ${field('Arrow Thickness', numberEl('batch-arrowThickness','', 0.5, 6, 0.5))}
         ${field('Arrow Head',      numberEl('batch-arrowHeadSize', '', 2, 20))}
         ${field('Arrow Gap',       numberEl('batch-arrowGap',      '', 0, 40))}
@@ -304,6 +307,7 @@ function renderEdgePanel(edge, updateFn, tStep, defaults = null) {
 
   bindRadio('routing', v => updateFn(edge.id, { routing: v }));
   bindRadio('lineType', v => updateFn(edge.id, { arrowStyle: { type: v } }));
+  bind('input[name="edge-color"]', 'input', v => updateFn(edge.id, { arrowStyle: { color: v } }));
   bind('input[name="thickness"]', 'input', v => updateFn(edge.id, { arrowStyle: { thickness: Number(v) } }));
   bind('input[name="headSize"]', 'input', v => updateFn(edge.id, { arrowStyle: { headSize: Number(v) } }));
 
@@ -327,7 +331,7 @@ function renderEdgePanel(edge, updateFn, tStep, defaults = null) {
       fontSize:   defaults?.style?.fontSize    ?? 12,
       fontWeight: defaults?.style?.fontWeight  ?? 'normal',
       fontStyle:  defaults?.style?.fontStyle   ?? 'normal',
-      color:      defaults?.style?.borderColor ?? '#444444',
+      color:      defaults?.style?.borderColor ?? '#000000',
     };
     updateFn(edge.id, { annotations: { items: [...items, newItem] } });
   });
@@ -349,7 +353,7 @@ function annotItemHTML(item, idx, tStep) {
     ${field('Distance', numberEl(`annot-dist-${item.id}`, item.dist ?? 40, 10, 200))}
     ${field('Show Arrow',      checkboxEl(`annot-arrow-${item.id}`,         item.showArrow      ?? true))}
     ${field('Arrow Gap',       numberEl(`annot-gap-${item.id}`,             item.arrowGap       ?? 2, 0, 40))}
-    ${field('Arrow Color',     colorEl(`annot-arrowColor-${item.id}`,       item.arrowColor     ?? '#555555'))}
+    ${field('Arrow Color',     colorEl(`annot-arrowColor-${item.id}`,       item.arrowColor     ?? '#000000'))}
     ${field('Arrow Thickness', numberEl(`annot-arrowThickness-${item.id}`,  item.arrowThickness ?? 1.5, 0.5, 6, 0.5))}
     ${field('Arrow Head',      numberEl(`annot-arrowHeadSize-${item.id}`,   item.arrowHeadSize  ?? 6, 2, 20))}
   </div>`;

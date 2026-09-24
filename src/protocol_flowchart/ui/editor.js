@@ -26,7 +26,7 @@ let snapMode          = true;
 let snapStep          = 0.1;
 let gridSnap          = true;
 let gridSize          = 10;
-let nodeDefaults      = { shape: 'none', style: { borderColor: '#333333', fillColor: '#ffffff', fontSize: 14, fontWeight: 'normal', fontStyle: 'normal' } };
+let nodeDefaults      = { shape: 'none', style: { borderColor: '#000000', fillColor: '#ffffff', fontSize: 14, fontWeight: 'normal', fontStyle: 'normal' } };
 
 // ── DOM ───────────────────────────────────────────────────────────────────────
 

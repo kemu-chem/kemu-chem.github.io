@@ -24,7 +24,7 @@ export function addNode(graph, props = {}) {
     label: props.label ?? 'New Node',
     shape: props.shape ?? 'none',
     style: {
-      borderColor: props.style?.borderColor ?? '#333333',
+      borderColor: props.style?.borderColor ?? '#000000',
       fillColor:   props.style?.fillColor   ?? '#ffffff',
       fontSize:    props.style?.fontSize    ?? 14,
       fontWeight:  props.style?.fontWeight  ?? 'normal',
@@ -82,7 +82,7 @@ export function addEdge(graph, fromId, toId, props = {}) {
       type:      props.arrowStyle?.type      ?? 'normal',
       thickness: props.arrowStyle?.thickness ?? 2,
       headSize:  props.arrowStyle?.headSize  ?? 10,
-      color:     props.arrowStyle?.color     ?? '#333333',
+      color:     props.arrowStyle?.color     ?? '#000000',
     },
   };
 

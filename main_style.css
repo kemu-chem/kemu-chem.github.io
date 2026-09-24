@@ -176,6 +176,12 @@ i {
     font-weight: bold;
 }
 
+.load-error {
+    color: #b91c1c;
+    font-weight: bold;
+    white-space: pre-wrap;
+}
+
 .portal-btn {
     display: inline-flex;
     align-items: center;
