@@ -7,6 +7,30 @@
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <link rel="stylesheet" href="main_style.css">
+    <style>
+        /* Page-local colors; light values match the former inline styles. */
+        .ref-subtitle { font-size: 0.9em; color: #666; margin-top: 5px; }
+        .help-box { font-size: small; margin-top: 10px; padding: 10px; background-color: #f9f9f9; border-left: 3px solid #4CAF50; }
+        .doi-example { background-color: #fff; padding: 5px; margin-top: 5px; border: 1px solid #ddd; font-family: monospace; }
+        [data-theme="dark"] .ref-subtitle { color: var(--text-muted); }
+        [data-theme="dark"] .help-box { background-color: var(--surface-muted); }
+        [data-theme="dark"] .doi-example { background-color: var(--input-bg); border-color: var(--border-color); }
+
+        /* Detail (output formatting) panel */
+        .detail-bar { margin-top: 8px; }
+        .detail-btn { padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 5px; background: var(--surface-muted); color: var(--text-color); cursor: pointer; white-space: nowrap; }
+        .detail-btn:hover { border-color: var(--primary); }
+        .detail-btn[aria-expanded="true"] .detail-caret { display: inline-block; transform: rotate(180deg); }
+        .detail-btn.is-custom::after { content: "Custom"; margin-left: 6px; padding: 0 5px; border-radius: 8px; font-size: 10px; background: var(--primary); color: #fff; }
+        .detail-panel { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--surface-muted); font-size: 14px; }
+        .detail-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .detail-row label { font-weight: 600; }
+        #detail_font_custom { width: 140px; padding: 3px 5px; }
+        #detail_size { width: 60px; padding: 3px 5px; }
+        .detail-unit { color: var(--text-muted); margin-left: -4px; }
+        .detail-reset { margin-left: auto; padding: 3px 10px; border: 1px solid var(--border-color); border-radius: 5px; background: var(--card-bg); color: var(--text-muted); cursor: pointer; }
+        .detail-reset:hover { color: var(--status-error); border-color: var(--status-error); }
+    </style>
 </head>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-1PK2SJTJ75"></script>
 <script>
@@ -21,7 +45,7 @@
     <div class="card">
         <a href="index.html" class="portal-btn">&#8592; Portal</a>
         <h1>RefConverter - Simple & Fast Reference Generator</h1>
-        <p style="font-size: 0.9em; color: #666; margin-top: 5px;">BibTeX & RIS & DOI</p>
+        <p class="ref-subtitle">BibTeX & RIS & DOI</p>
         <div id="status-msg" class="loading">Initializing python environment...</div>
 
         <div id="drop_zone">Drop .bib/.ris/.txt files, or click here to select files. (.bib / .ris / .txt)</div>
@@ -68,19 +92,42 @@
             <button id="reload_modules_btn" py-click="reload_modules">Force Reload Modules</button>-->
         </div>
 
+        <div class="detail-bar">
+            <button type="button" id="detail_btn" class="detail-btn" aria-expanded="false"
+                aria-controls="detail_panel" title="Output font / size">Detail <span class="detail-caret">&#9662;</span></button>
+        </div>
+        <div id="detail_panel" class="detail-panel" hidden>
+            <div class="detail-row">
+                <label for="detail_font">Font</label>
+                <select id="detail_font">
+                    <option value="">Default (Times New Roman)</option>
+                    <option value="Arial">Arial</option>
+                    <option value="Calibri">Calibri</option>
+                    <option value="Cambria">Cambria</option>
+                    <option value="Century">Century</option>
+                    <option value="Yu Mincho">游明朝</option>
+                    <option value="Yu Gothic">游ゴシック</option>
+                    <option value="__custom__">Custom...</option>
+                </select>
+                <input type="text" id="detail_font_custom" placeholder="Font name" hidden>
+                <label for="detail_size">Size</label>
+                <input type="number" id="detail_size" placeholder="12" min="6" max="36" step="0.5">
+                <span class="detail-unit">pt</span>
+                <button type="button" id="detail_reset" class="detail-reset">Reset</button>
+            </div>
+        </div>
+
         <div id="output"></div>
-        <div id="cache-info" style="font-size: small; color: blue; margin-top: 10px;"></div>
+        <div id="cache-info" style="font-size: small; color: var(--status-info); margin-top: 10px;"></div>
         <div id="note" style="font-size: small;">Note: This is a web application and does not store any data on the
             server.</div>
-        <div id="help"
-            style="font-size: small; margin-top: 10px; padding: 10px; background-color: #f9f9f9; border-left: 3px solid #4CAF50;">
+        <div id="help" class="help-box">
             <strong>Help:</strong> You can paste different formats:
             <ul style="margin: 5px 0; padding-left: 20px;">
                 <li><strong>BibTeX:</strong> Entries starting with @article, @book, etc.</li>
                 <li><strong>RIS:</strong> Entries with TY, AU, TI tags</li>
                 <li><strong>DOI List (.txt):</strong> One DOI per line. Examples:
-                    <div
-                        style="background-color: #fff; padding: 5px; margin-top: 5px; border: 1px solid #ddd; font-family: monospace;">
+                    <div class="doi-example">
                         10.1021/ja960582d<br>
                         https://doi.org/10.1002/ange.19550671306<br>
                     </div>
@@ -191,7 +238,7 @@
                 globals()['DOIProcessor'] = DOIProcessor
 
                 cache_info_div.innerHTML = f"✓ Modules reloaded successfully! Removed {len(modules_to_remove)} cached modules."
-                cache_info_div.style.color = "green"
+                cache_info_div.style.color = "var(--status-ok)"
 
                 # Show current signature
                 import inspect
@@ -200,7 +247,7 @@
 
             except Exception as e:
                 cache_info_div.innerHTML = f"✗ Error reloading modules: {e}"
-                cache_info_div.style.color = "red"
+                cache_info_div.style.color = "var(--status-error)"
 
         def show_debug_info(event):
             """Display debug information about loaded modules"""
@@ -385,6 +432,83 @@
     </script>
 
     <script>
+        // Output "Detail" panel: display-only formatting of #output (font / size).
+        // Pure CSS on #output, so no Python re-conversion is needed.
+        window.RefDetail = (function () {
+            const FONT_STACKS = {
+                'Arial': 'Arial, Helvetica, sans-serif',
+                'Calibri': 'Calibri, Carlito, sans-serif',
+                'Cambria': 'Cambria, Caladea, serif',
+                'Century': 'Century, "Century Schoolbook", serif',
+                'Yu Mincho': '"Yu Mincho", "游明朝", YuMincho, serif',
+                'Yu Gothic': '"Yu Gothic", "游ゴシック", YuGothic, sans-serif'
+            };
+            const btn = document.getElementById('detail_btn');
+            const panel = document.getElementById('detail_panel');
+            const fontSel = document.getElementById('detail_font');
+            const fontCustom = document.getElementById('detail_font_custom');
+            const sizeIn = document.getElementById('detail_size');
+            const resetBtn = document.getElementById('detail_reset');
+            const output = document.getElementById('output');
+            const api = { onChange: null };
+
+            function sizeValue() {
+                const v = parseFloat(sizeIn.value);
+                return (isFinite(v) && v >= 6 && v <= 36) ? v : null;
+            }
+
+            function fontFamilyCss() {
+                const f = fontSel.value;
+                if (f === '__custom__') {
+                    const name = fontCustom.value.replace(/["\\;{}<>]/g, '').trim();
+                    return name ? '"' + name + '", serif' : '';
+                }
+                return FONT_STACKS[f] || '';
+            }
+
+            function render() {
+                fontCustom.hidden = fontSel.value !== '__custom__';
+                output.style.fontFamily = fontFamilyCss();   // '' -> falls back to main_style.css
+                const pt = sizeValue();
+                output.style.fontSize = pt ? pt + 'pt' : '';
+                btn.classList.toggle('is-custom', !!(output.style.fontFamily || output.style.fontSize));
+            }
+
+            function changed() {
+                render();
+                if (api.onChange) api.onChange();
+            }
+
+            api.getState = function () {
+                return { font: fontSel.value, font_custom: fontCustom.value, size_pt: sizeIn.value };
+            };
+
+            api.applyState = function (s) {
+                if (!s) return;
+                if (s.font !== undefined && [...fontSel.options].some(o => o.value === s.font)) fontSel.value = s.font;
+                if (s.font_custom !== undefined) fontCustom.value = s.font_custom;
+                if (s.size_pt !== undefined) sizeIn.value = s.size_pt;
+                render();
+            };
+
+            btn.addEventListener('click', () => {
+                panel.hidden = !panel.hidden;
+                btn.setAttribute('aria-expanded', String(!panel.hidden));
+            });
+            fontSel.addEventListener('change', changed);
+            fontCustom.addEventListener('input', changed);
+            sizeIn.addEventListener('input', changed);
+            resetBtn.addEventListener('click', () => {
+                fontSel.value = '';
+                fontCustom.value = '';
+                sizeIn.value = '';
+                changed();
+            });
+
+            render();
+            return api;
+        })();
+
         const dropZone = document.getElementById('drop_zone');
         const fileInput = document.getElementById('file_input');
         const bibInput = document.getElementById('bib_input');
@@ -478,7 +602,8 @@
                     reverse_authors: reverseAuthorsCheck.checked,
                     abbrev_journal: abbrevJournalCheck.checked,
                     show_doi: showDoiCheck.checked,
-                    input_text: bibInput.value
+                    input_text: bibInput.value,
+                    detail: window.RefDetail.getState()
                 });
 
                 const loadBibState = (state) => {
@@ -491,6 +616,7 @@
                     if (state.abbrev_journal !== undefined) abbrevJournalCheck.checked = state.abbrev_journal;
                     if (state.show_doi !== undefined) showDoiCheck.checked = state.show_doi;
                     if (state.input_text !== undefined && !bibInput.value) bibInput.value = state.input_text;
+                    window.RefDetail.applyState(state.detail);
                     triggerConvert();
                 };
 
@@ -509,6 +635,7 @@
                 [maxNInput, bibInput].forEach(el => {
                     el.addEventListener('input', notifyChange);
                 });
+                window.RefDetail.onChange = notifyChange;
             }
         });
     </script>
