@@ -1,6 +1,12 @@
 // DAG data model for protocol flowcharts.
 // Zero dependencies — safe to import in any context.
 
+// One ink colour for everything that is drawn rather than filled: label text,
+// node borders, edge arrows, annotation text and annotation arrows. The renderer
+// falls back to this, new objects are created with it, and the legacy migration
+// below rewrites the old greys to it, so there is only one value to change.
+export const INK = '#000000';
+
 export function createGraph(meta = {}) {
   return {
     nodes: [],
@@ -24,7 +30,7 @@ export function addNode(graph, props = {}) {
     label: props.label ?? 'New Node',
     shape: props.shape ?? 'none',
     style: {
-      borderColor: props.style?.borderColor ?? '#000000',
+      borderColor: props.style?.borderColor ?? INK,
       fillColor:   props.style?.fillColor   ?? '#ffffff',
       fontSize:    props.style?.fontSize    ?? 14,
       fontWeight:  props.style?.fontWeight  ?? 'normal',
@@ -82,7 +88,7 @@ export function addEdge(graph, fromId, toId, props = {}) {
       type:      props.arrowStyle?.type      ?? 'normal',
       thickness: props.arrowStyle?.thickness ?? 2,
       headSize:  props.arrowStyle?.headSize  ?? 10,
-      color:     props.arrowStyle?.color     ?? '#000000',
+      color:     props.arrowStyle?.color     ?? INK,
     },
   };
 
@@ -222,6 +228,44 @@ export function fromJSON(json) {
     if (!edge.annotations.items) edge.annotations.items = [];
   }
   return g;
+}
+
+// ── Legacy colour normalisation ───────────────────────────────────────────────
+
+// Grey defaults written into saved graphs by versions before the black-ink
+// unification. Text, node borders and arrow colours all default to #000000 now,
+// so these exact values are rewritten on load; anything else the user picked
+// deliberately is left alone. Trim this list to stop migrating a given value.
+const LEGACY_INK_GREYS = new Set([
+  '#333333', '#333',   // node border/text, edge arrow, coil arrow
+  '#444444', '#444',   // annotation text
+  '#555555', '#555',   // annotation arrow
+  '#666666', '#666',   // dashed-edge arrow
+]);
+
+const blackenLegacy = v =>
+  typeof v === 'string' && LEGACY_INK_GREYS.has(v.trim().toLowerCase()) ? INK : v;
+
+// Rewrites legacy grey ink to black in place, and reports how many values changed.
+// Call this when loading a graph from storage or a file — not from fromJSON, so
+// that undo/redo never recolours something the user deliberately set to grey.
+export function normalizeLegacyColors(graph) {
+  let changed = 0;
+  const fix = (obj, key) => {
+    if (!obj) return;
+    const next = blackenLegacy(obj[key]);
+    if (next !== obj[key]) { obj[key] = next; changed++; }
+  };
+
+  for (const node of graph.nodes ?? []) fix(node.style, 'borderColor');
+  for (const edge of graph.edges ?? []) {
+    fix(edge.arrowStyle, 'color');
+    for (const item of edge.annotations?.items ?? []) {
+      fix(item, 'color');
+      fix(item, 'arrowColor');
+    }
+  }
+  return changed;
 }
 
 // ── Internal ──────────────────────────────────────────────────────────────────

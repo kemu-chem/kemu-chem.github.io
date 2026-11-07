@@ -2,7 +2,7 @@ import {
   createGraph, addNode, addEdge, removeNode, removeEdge,
   updateNode, updateEdge, findNode, findEdge,
   edgesTo, edgesFrom,
-  toJSON, fromJSON, getComponent, uid,
+  toJSON, fromJSON, getComponent, uid, normalizeLegacyColors,
 } from '../core/graph.js';
 import { applyLayout } from '../core/layout.js';
 import { renderSVG, downloadSVG, borderPoint } from '../renderers/svg.js';
@@ -277,6 +277,7 @@ jsonFileInput.addEventListener('change', () => {
   reader.onload = (e) => {
     try {
       graph = fromJSON(e.target.result);
+      normalizeLegacyColors(graph);
       titleInput.value = graph.meta.title || '';
       fontSelect.value = graph.meta.fontFamily ?? 'sans-serif';
       if (padInput) padInput.value = graph.meta.nodePadding ?? 8;
@@ -603,21 +604,21 @@ svg.addEventListener('wheel', (e) => {
 function updateToolbarColors() {
   if (multiSelection.size >= 2) {
     const n = graph.nodes.find(n => multiSelection.has(n.id));
-    if (n) { tbTextColor.value = n.style.borderColor ?? '#333333'; tbFillColor.value = n.style.fillColor ?? '#ffffff'; }
-    tbArrowColor.value = '#333333';
+    if (n) { tbTextColor.value = n.style.borderColor ?? '#000000'; tbFillColor.value = n.style.fillColor ?? '#ffffff'; }
+    tbArrowColor.value = '#000000';
   } else if (edgeMultiSel.size >= 2) {
     const e = graph.edges.find(e => edgeMultiSel.has(e.id));
-    if (e) tbArrowColor.value = e.arrowStyle.color ?? '#333333';
+    if (e) tbArrowColor.value = e.arrowStyle.color ?? '#000000';
   } else if (selection?.type === 'node') {
     const n = findNode(graph, selection.id);
-    if (n) { tbTextColor.value = n.style.borderColor ?? '#333333'; tbFillColor.value = n.style.fillColor ?? '#ffffff'; }
+    if (n) { tbTextColor.value = n.style.borderColor ?? '#000000'; tbFillColor.value = n.style.fillColor ?? '#ffffff'; }
   } else if (selection?.type === 'edge') {
     const e = findEdge(graph, selection.id);
-    if (e) tbArrowColor.value = e.arrowStyle.color ?? '#333333';
+    if (e) tbArrowColor.value = e.arrowStyle.color ?? '#000000';
   } else if (selection?.type === 'annot') {
     const e = findEdge(graph, selection.edgeId);
     const it = e?.annotations.items.find(i => i.id === selection.id);
-    if (it) tbTextColor.value = it.color ?? '#444444';
+    if (it) tbTextColor.value = it.color ?? '#000000';
   }
 }
 
@@ -1257,6 +1258,7 @@ const cached = localStorage.getItem(STORAGE_KEY);
 if (cached) {
   try {
     graph = fromJSON(cached);
+    normalizeLegacyColors(graph);
     titleInput.value = graph.meta.title || '';
     fontSelect.value = graph.meta.fontFamily ?? 'sans-serif';
     if (padInput) padInput.value = graph.meta.nodePadding ?? 8;

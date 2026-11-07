@@ -90,7 +90,7 @@ function renderMultiPanel(nodes, updateFn) {
   panelEl.innerHTML = `
     <h3 style="${H3}">${nodes.length} Nodes Selected</h3>
     ${field('Shape', selectEl('shape', '', [['', '(No change)'], ['none', 'None'], ['box', 'Box'], ['circle', 'Circle'], ['diamond', 'Diamond']]))}
-    ${field('Border Color', colorEl('borderColor', '#333333'))}
+    ${field('Border Color', colorEl('borderColor', '#000000'))}
     ${field('Fill Color', colorEl('fillColor', '#ffffff'))}
     ${field('Font Size', `
       <div style="display:flex;gap:6px;align-items:center;">
@@ -327,13 +327,17 @@ function renderEdgePanel(edge, updateFn, tStep, defaults = null) {
   document.getElementById('btn-add-annot').addEventListener('click', () => {
     const newItem = {
       id: uid(), side: 'above', t: 0.5, label: '', dist: 40, showArrow: true, snap: true, arrowGap: 2,
+      arrowColor: '#000000', arrowThickness: 1.5, arrowHeadSize: 6,
       shape:      defaults?.shape              ?? 'none',
       fontSize:   defaults?.style?.fontSize    ?? 12,
       fontWeight: defaults?.style?.fontWeight  ?? 'normal',
       fontStyle:  defaults?.style?.fontStyle   ?? 'normal',
       color:      defaults?.style?.borderColor ?? '#000000',
     };
-    updateFn(edge.id, { annotations: { items: [...items, newItem] } });
+    // Read the items live: per-item edits only trigger redrawQuiet(), which leaves
+    // this panel (and its render-time `items`) in place, so a captured array would
+    // revert every edit made since the panel was rendered.
+    updateFn(edge.id, { annotations: { items: [...(edge.annotations.items ?? []), newItem] } });
   });
 }
 

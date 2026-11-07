@@ -1,7 +1,12 @@
-import { findNode } from '../core/graph.js';
+import { findNode, INK } from '../core/graph.js';
 
 const COIL_R     = 16;   // Coil arrow arc radius
 const ANNOT_DIST = 40;   // px from edge to annotation box center
+
+// Fallbacks for annotation items that carry no explicit arrow style; shared by the
+// marker <defs> and the line itself so the head never scales differently.
+const ANNOT_ARROW_THICKNESS = 1.5;
+const ANNOT_ARROW_HEAD      = 6;
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
@@ -20,16 +25,16 @@ export function renderSVG(graph, opts = {}) {
   parts.push('<defs>');
   // Per-edge main arrow markers
   for (const edge of graph.edges) {
-    const color = edge.arrowStyle.color ?? '#000000';
+    const color = edge.arrowStyle.color ?? INK;
     parts.push(arrowMarkerDef(`arrow-${edge.id}`, color, edge.arrowStyle.headSize, edge.arrowStyle.thickness));
     // Per-annotation arrow markers (color/size customisable)
     for (const item of (edge.annotations?.items ?? [])) {
       if (!(item.showArrow ?? true)) continue;
       parts.push(arrowMarkerDef(
         `annot-arrow-${item.id}`,
-        item.arrowColor ?? '#555555',
-        item.arrowHeadSize ?? 6,
-        item.arrowThickness ?? 1,
+        item.arrowColor     ?? INK,
+        item.arrowHeadSize  ?? ANNOT_ARROW_HEAD,
+        item.arrowThickness ?? ANNOT_ARROW_THICKNESS,
       ));
     }
   }
@@ -56,7 +61,7 @@ function renderNode(node, overrideStyle = {}, fontFamily = 'sans-serif', pad = 8
   const style    = { ...node.style, ...overrideStyle };
   const labelStr = String(node.label || '');
   const { x, y, shape } = node;
-  const stroke   = style.borderColor ?? '#333333';
+  const stroke   = style.borderColor ?? INK;
 
   // Empty label → invisible junction; render a tiny dot as visual cue
   if (!labelStr.trim()) {
@@ -100,7 +105,7 @@ function renderEdge(edge, from, to, markerId, fontFamily = 'sans-serif', pad = 8
   const parts = [];
   const { thickness, headSize, type } = edge.arrowStyle;
   const dashed = type === 'dashed' ? `stroke-dasharray="${headSize * 1.5} ${headSize}"` : '';
-  const color  = edge.arrowStyle.color ?? '#000000';
+  const color  = edge.arrowStyle.color ?? INK;
 
   const path = edge.routing === 'orthogonal'
     ? orthogonalPath(from, to, pad)
@@ -142,14 +147,14 @@ function renderAnnotationItem(item, edge, from, to, fontFamily = 'sans-serif', p
   const proxy = {
     label: item.label || ' ',
     shape: item.shape ?? 'none',
-    style: { borderColor: item.color ?? '#444444', fillColor: '#f8f8f8', fontSize: item.fontSize ?? 12, fontWeight: item.fontWeight ?? 'normal', fontStyle: item.fontStyle ?? 'normal' },
+    style: { borderColor: item.color ?? INK, fillColor: '#f8f8f8', fontSize: item.fontSize ?? 12, fontWeight: item.fontWeight ?? 'normal', fontStyle: item.fontStyle ?? 'normal' },
     x: cx, y: cy,
   };
 
   const showArrow      = item.showArrow      ?? true;
   const arrowGap       = item.arrowGap       ?? 2;
-  const arrowColor     = item.arrowColor     ?? '#555555';
-  const arrowThickness = item.arrowThickness ?? 1.5;
+  const arrowColor     = item.arrowColor     ?? INK;
+  const arrowThickness = item.arrowThickness ?? ANNOT_ARROW_THICKNESS;
   const arrowLine = showArrow
     ? (() => {
       const bp  = borderPoint(proxy, edgePt.x, edgePt.y, pad);
@@ -279,8 +284,8 @@ function coilArrow(cx, cy, r, thickness, headSize) {
   const ax1 = ex + headSize * Math.cos(ta - 0.5), ay1 = ey + headSize * Math.sin(ta - 0.5);
   const ax2 = ex + headSize * Math.cos(ta + 0.5), ay2 = ey + headSize * Math.sin(ta + 0.5);
   return [
-    `<path d="M ${sx.toFixed(2)} ${sy.toFixed(2)} A ${r} ${r} 0 1 1 ${ex.toFixed(2)} ${ey.toFixed(2)}" fill="none" stroke="#333" stroke-width="${thickness}"/>`,
-    `<polygon points="${ex.toFixed(2)},${ey.toFixed(2)} ${ax1.toFixed(2)},${ay1.toFixed(2)} ${ax2.toFixed(2)},${ay2.toFixed(2)}" fill="#333"/>`,
+    `<path d="M ${sx.toFixed(2)} ${sy.toFixed(2)} A ${r} ${r} 0 1 1 ${ex.toFixed(2)} ${ey.toFixed(2)}" fill="none" stroke="${INK}" stroke-width="${thickness}"/>`,
+    `<polygon points="${ex.toFixed(2)},${ey.toFixed(2)} ${ax1.toFixed(2)},${ay1.toFixed(2)} ${ax2.toFixed(2)},${ay2.toFixed(2)}" fill="${INK}"/>`,
   ].join('\n');
 }
 
