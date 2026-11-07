@@ -23,7 +23,11 @@ def rtf_to_html(rtf_text):
     # Clean up remaining RTF codes
     rtf_text = re.sub(r'\\[a-z]+\d*\s*', '', rtf_text)
     rtf_text = rtf_text.replace('\\\\', '\\').replace('\\{', '{').replace('\\}', '}')
-    
+
+    # Element markers (bibcite_core.mark_element) -> <span class="cit-NAME">
+    rtf_text = re.sub('\ue000([a-z]+)\ue001', r'<span class="cit-\1">', rtf_text)
+    rtf_text = rtf_text.replace('\ue002', '</span>')
+
     return rtf_text.strip()
 
 class RISProcessor:

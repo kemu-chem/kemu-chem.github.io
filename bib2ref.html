@@ -30,6 +30,17 @@
         .detail-unit { color: var(--text-muted); margin-left: -4px; }
         .detail-reset { margin-left: auto; padding: 3px 10px; border: 1px solid var(--border-color); border-radius: 5px; background: var(--card-bg); color: var(--text-muted); cursor: pointer; }
         .detail-reset:hover { color: var(--status-error); border-color: var(--status-error); }
+        .detail-elems-row { margin-top: 8px; align-items: flex-start; }
+        .detail-elems-label { font-weight: 600; padding-top: 3px; }
+        .detail-elems { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+        .elem-chip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 4px 2px 8px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--card-bg); }
+        .elem-name { font-size: 12px; margin-right: 2px; }
+        .elem-tri { width: 22px; height: 20px; padding: 0; border: 1px dashed var(--border-strong); border-radius: 4px; background: transparent; color: var(--text-muted); font: 12px "Times New Roman", serif; cursor: pointer; }
+        .elem-tri[data-prop="b"] { font-weight: bold; }
+        .elem-tri[data-prop="i"] { font-style: italic; }
+        .elem-tri[data-state="on"] { border-style: solid; border-color: var(--primary); background: var(--primary); color: #fff; }
+        .elem-tri[data-state="off"] { border-style: solid; border-color: var(--status-error); color: var(--status-error); text-decoration: line-through; }
+        .detail-hint { margin-top: 6px; font-size: 11px; color: var(--text-muted); }
     </style>
 </head>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-1PK2SJTJ75"></script>
@@ -61,6 +72,7 @@
                 <option>Vancouver</option>
                 <option>Angewandte</option>
                 <option>RSC</option>
+                <option>BCSJ</option>
                 <option>Nature</option>
                 <option>IEEE</option>
                 <option>ISO 690</option>
@@ -113,8 +125,14 @@
                 <label for="detail_size">Size</label>
                 <input type="number" id="detail_size" placeholder="12" min="6" max="36" step="0.5">
                 <span class="detail-unit">pt</span>
-                <button type="button" id="detail_reset" class="detail-reset">Reset</button>
+                <button type="button" id="detail_reset" class="detail-reset"
+                    title="Reset font, size and this style's element overrides">Reset</button>
             </div>
+            <div class="detail-row detail-elems-row">
+                <span class="detail-elems-label">Elements (<span id="detail_style_name"></span>)</span>
+                <div id="detail_elems" class="detail-elems"></div>
+            </div>
+            <div class="detail-hint">B / I: click to cycle style default &rarr; on &rarr; off. Saved per citation style.</div>
         </div>
 
         <div id="output"></div>
@@ -419,7 +437,12 @@
                         display_entry['journal'] = JOURNAL_ABBR.get(key, display_entry['journal'])
                     if not show_doi:
                         display_entry['doi'] = ''
-                    _, rtf = formatter(display_entry, i, max_n=max_n, omit_title=omit_title, reverse_authors=False)
+                    try:
+                        # mark_elements: wrap each element in <span class="cit-..."> for the Detail panel
+                        _, rtf = formatter(display_entry, i, max_n=max_n, omit_title=omit_title, reverse_authors=False, mark_elements=True)
+                    except TypeError:
+                        # browser-cached older bibcite_core without mark_elements
+                        _, rtf = formatter(display_entry, i, max_n=max_n, omit_title=omit_title, reverse_authors=False)
                     html_output += f'<div class="citation-item">{rtf_to_html(rtf)}</div>'
 
                 output_div.innerHTML = html_output
@@ -432,9 +455,24 @@
     </script>
 
     <script>
-        // Output "Detail" panel: display-only formatting of #output (font / size).
-        // Pure CSS on #output, so no Python re-conversion is needed.
+        // Output "Detail" panel: display-only formatting of #output.
+        //  - font / size: global, applied as inline style on #output
+        //  - per-element bold/italic overrides: saved per citation style, applied as inline
+        //    styles on <span class="cit-NAME"> (emitted by bibcite_core mark_elements=True),
+        //    so they survive copy & paste. No Python re-conversion is needed.
         window.RefDetail = (function () {
+            const ELEMENTS = [
+                ['author', 'Author'], ['title', 'Title'], ['journal', 'Journal'], ['year', 'Year'],
+                ['volume', 'Volume'], ['issue', 'Issue'], ['pages', 'Pages'], ['doi', 'DOI'],
+                ['publisher', 'Publisher']
+            ];
+            const ELEMENT_IDS = ELEMENTS.map(e => e[0]);
+            const PROP_LABEL = { b: 'Bold', i: 'Italic' };
+            const NEXT_STATE = { '': 'on', on: 'off', off: '' };
+            let overrides = {};   // { styleName: { element: { b: 'on'|'off', i: 'on'|'off' } } }
+            const styleSel = document.getElementById('style_select');
+            const styleNameEl = document.getElementById('detail_style_name');
+            const elemsBox = document.getElementById('detail_elems');
             const FONT_STACKS = {
                 'Arial': 'Arial, Helvetica, sans-serif',
                 'Calibri': 'Calibri, Carlito, sans-serif',
@@ -466,12 +504,65 @@
                 return FONT_STACKS[f] || '';
             }
 
+            function styleOverrides() {
+                return overrides[styleSel.value] || {};
+            }
+
+            function setOverride(el, prop, state) {
+                const style = styleSel.value;
+                const s = overrides[style] = overrides[style] || {};
+                const e = s[el] = s[el] || {};
+                if (state) e[prop] = state; else delete e[prop];
+                if (!Object.keys(e).length) delete s[el];
+                if (!Object.keys(s).length) delete overrides[style];
+            }
+
+            function buildElementChips() {
+                styleNameEl.textContent = styleSel.value;
+                const ov = styleOverrides();
+                elemsBox.textContent = '';
+                ELEMENTS.forEach(([id, label]) => {
+                    const chip = document.createElement('span');
+                    chip.className = 'elem-chip';
+                    const name = document.createElement('span');
+                    name.className = 'elem-name';
+                    name.textContent = label;
+                    chip.appendChild(name);
+                    ['b', 'i'].forEach(prop => {
+                        const state = (ov[id] && ov[id][prop]) || '';
+                        const b = document.createElement('button');
+                        b.type = 'button';
+                        b.className = 'elem-tri';
+                        b.dataset.el = id;
+                        b.dataset.prop = prop;
+                        b.dataset.state = state;
+                        b.textContent = prop.toUpperCase();
+                        b.title = label + ' ' + PROP_LABEL[prop] + ': ' + (state || 'style default');
+                        chip.appendChild(b);
+                    });
+                    elemsBox.appendChild(chip);
+                });
+            }
+
+            // Inline styles on the element spans (only for overridden props; '' restores the style default)
+            function applyElementStyles() {
+                const ov = styleOverrides();
+                output.querySelectorAll('span[class^="cit-"]').forEach(span => {
+                    const o = ov[span.className.slice(4)] || {};
+                    span.style.fontWeight = o.b === 'on' ? 'bold' : o.b === 'off' ? 'normal' : '';
+                    span.style.fontStyle = o.i === 'on' ? 'italic' : o.i === 'off' ? 'normal' : '';
+                });
+            }
+
             function render() {
                 fontCustom.hidden = fontSel.value !== '__custom__';
                 output.style.fontFamily = fontFamilyCss();   // '' -> falls back to main_style.css
                 const pt = sizeValue();
                 output.style.fontSize = pt ? pt + 'pt' : '';
-                btn.classList.toggle('is-custom', !!(output.style.fontFamily || output.style.fontSize));
+                buildElementChips();
+                applyElementStyles();
+                btn.classList.toggle('is-custom',
+                    !!(output.style.fontFamily || output.style.fontSize || Object.keys(styleOverrides()).length));
             }
 
             function changed() {
@@ -480,16 +571,52 @@
             }
 
             api.getState = function () {
-                return { font: fontSel.value, font_custom: fontCustom.value, size_pt: sizeIn.value };
+                return {
+                    font: fontSel.value, font_custom: fontCustom.value, size_pt: sizeIn.value,
+                    elements: JSON.parse(JSON.stringify(overrides))
+                };
             };
 
+            // Accept only known elements / props / states from stored (or imported) JSON
+            function sanitizeOverrides(raw) {
+                const out = {};
+                if (!raw || typeof raw !== 'object') return out;
+                Object.keys(raw).forEach(style => {
+                    const s = raw[style];
+                    if (!s || typeof s !== 'object') return;
+                    Object.keys(s).forEach(el => {
+                        if (!ELEMENT_IDS.includes(el) || !s[el] || typeof s[el] !== 'object') return;
+                        ['b', 'i'].forEach(prop => {
+                            const v = s[el][prop];
+                            if (v === 'on' || v === 'off') {
+                                out[style] = out[style] || {};
+                                out[style][el] = out[style][el] || {};
+                                out[style][el][prop] = v;
+                            }
+                        });
+                    });
+                });
+                return out;
+            }
+
             api.applyState = function (s) {
-                if (!s) return;
+                if (!s) { render(); return; }   // still sync the panel to a restored style_select
                 if (s.font !== undefined && [...fontSel.options].some(o => o.value === s.font)) fontSel.value = s.font;
                 if (s.font_custom !== undefined) fontCustom.value = s.font_custom;
                 if (s.size_pt !== undefined) sizeIn.value = s.size_pt;
+                if (s.elements !== undefined) overrides = sanitizeOverrides(s.elements);
                 render();
             };
+
+            elemsBox.addEventListener('click', (e) => {
+                const b = e.target.closest('.elem-tri');
+                if (!b) return;
+                setOverride(b.dataset.el, b.dataset.prop, NEXT_STATE[b.dataset.state || '']);
+                changed();
+            });
+            styleSel.addEventListener('change', render);
+            // Re-apply element styles whenever Python replaces the output
+            new MutationObserver(applyElementStyles).observe(output, { childList: true });
 
             btn.addEventListener('click', () => {
                 panel.hidden = !panel.hidden;
@@ -502,12 +629,23 @@
                 fontSel.value = '';
                 fontCustom.value = '';
                 sizeIn.value = '';
+                delete overrides[styleSel.value];
                 changed();
             });
 
             render();
             return api;
         })();
+
+        // Styles that require abbreviated journal names (BCSJ: Chemical Abstracts abbreviations).
+        // Switching to one turns "Abbrev. Journal" on; it is never turned off automatically.
+        // Registered here (before the DOMContentLoaded handlers) so the save and the
+        // re-conversion triggered by the same change event already see the new checkbox state.
+        const STYLES_NEED_ABBR = ['BCSJ'];
+        document.getElementById('style_select').addEventListener('change', (e) => {
+            const abbr = document.getElementById('abbrev_journal_check');
+            if (STYLES_NEED_ABBR.includes(e.target.value) && !abbr.checked) abbr.checked = true;
+        });
 
         const dropZone = document.getElementById('drop_zone');
         const fileInput = document.getElementById('file_input');

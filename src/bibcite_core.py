@@ -270,14 +270,59 @@ class AuthorFormatter:
         else:
             return ", ".join(fmt[:-1]) + " and " + fmt[-1]
 
+    @staticmethod
+    def csj_initials(given: str) -> str:
+        """CSJ initials keep hyphenated given names: 'Da-Yong' -> 'D.-Y.'"""
+        out = []
+        for token in given.split():
+            sub = [p[0] + "." for p in token.split("-") if p]
+            if sub:
+                out.append("-".join(sub))
+        return " ".join(out)
+
+    @staticmethod
+    def csj(authors: List[Dict], max_n: int = None, reverse_authors: bool = False) -> str:
+        """CSJ (BCSJ / Chem. Lett.): G. I. Family, G.-H. Family (all authors unless max_n is set)"""
+        if not authors:
+            return ""
+        limit = max_n if (max_n is not None and max_n >= 1) else None
+        shown = authors if limit is None else authors[:limit]
+        fmt = []
+        for a in shown:
+            init = AuthorFormatter.csj_initials(a.get("given", ""))
+            fam = a.get("family", "")
+            fmt.append(f"{init} {fam}" if init else fam)
+        if reverse_authors and len(fmt) >= 2:
+            fmt[0], fmt[-1] = fmt[-1], fmt[0]
+        if limit is not None and len(authors) > limit:
+            return ", ".join(fmt) + ", et al."
+        return ", ".join(fmt)
+
+
+# Element markers (Unicode private-use chars) let the web UI style each citation
+# element separately. They are only emitted with mark_elements=True; rtf_to_html
+# turns them into <span class="cit-NAME">. Plain-text output never contains them.
+ELEM_START, ELEM_SEP, ELEM_END = "\ue000", "\ue001", "\ue002"
+_ELEM_MARK_RE = re.compile("\ue000[a-z]+\ue001|\ue002")
+MARKED_FIELDS = ("title", "journal", "year", "volume", "issue", "pages", "doi", "publisher")
+
+
+def mark_element(name: str, value: str) -> str:
+    """Wrap a non-empty value in element markers (empty values stay empty so truthiness checks still work)."""
+    return f"{ELEM_START}{name}{ELEM_SEP}{value}{ELEM_END}" if value else value
+
+
+def strip_element_marks(text: str) -> str:
+    return _ELEM_MARK_RE.sub("", text)
+
 
 class CitationFormatter:
     """Format citations in various journal styles"""
     
     @staticmethod
-    def _get_fields(entry: Dict) -> Dict:
-        """Extract and clean common fields"""
-        return {
+    def _get_fields(entry: Dict, mark: bool = False) -> Dict:
+        """Extract and clean common fields (optionally wrapped in element markers)"""
+        f = {
             'authors': BibTeXProcessor.parse_authors(entry.get("author", "")),
             'title': BibTeXProcessor.clean_latex(entry.get("title", "")),
             'journal': BibTeXProcessor.clean_latex(entry.get("journal", "")),
@@ -290,13 +335,26 @@ class CitationFormatter:
             'address': BibTeXProcessor.clean_latex(entry.get("address", "")),
             'entry_type': entry.get("ENTRYTYPE", "article").lower(),
         }
+        if mark:
+            for k in MARKED_FIELDS:
+                f[k] = mark_element(k, f[k])
+        return f
+
+    @staticmethod
+    def _author(auth: str, mark: bool) -> str:
+        return mark_element("author", auth) if mark else auth
+
+    @staticmethod
+    def _finish(plain: str, rtf: str) -> tuple:
+        return strip_element_marks(plain).strip(), rtf.strip()
         
     
     @staticmethod
-    def format_acs(entry: Dict, idx: int = 0, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False) -> tuple:
+    def format_acs(entry: Dict, idx: int = 0, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False, mark_elements: bool = False) -> tuple:
         """ACS style"""
-        f = CitationFormatter._get_fields(entry)
+        f = CitationFormatter._get_fields(entry, mark_elements)
         auth = AuthorFormatter.acs(f['authors'], max_n=max_n, reverse_authors=reverse_authors) if max_n is not None else AuthorFormatter.acs(f['authors'], reverse_authors=reverse_authors)
+        auth = CitationFormatter._author(auth, mark_elements)
 
         if f['entry_type'] == "article":
             if omit_title:
@@ -336,13 +394,14 @@ class CitationFormatter:
             else:
                 plain = f"{auth} {f['title']}. {f['year']}."
             rtf = RTFBuilder.escape(plain)
-        return plain.strip(), rtf.strip()
+        return CitationFormatter._finish(plain, rtf)
     
     @staticmethod
-    def format_apa(entry: Dict, idx: int = 0, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False) -> tuple:
+    def format_apa(entry: Dict, idx: int = 0, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False, mark_elements: bool = False) -> tuple:
         """APA 7th style"""
-        f = CitationFormatter._get_fields(entry)
+        f = CitationFormatter._get_fields(entry, mark_elements)
         auth = AuthorFormatter.apa(f['authors'], max_n=max_n, reverse_authors=reverse_authors) if max_n is not None else AuthorFormatter.apa(f['authors'], reverse_authors=reverse_authors)
+        auth = CitationFormatter._author(auth, mark_elements)
         vol_issue = f"{f['volume']}({f['issue']})" if f['issue'] else f['volume']
 
         if f['entry_type'] == "article":
@@ -383,13 +442,14 @@ class CitationFormatter:
             else:
                 plain = f"{auth} ({f['year']}). {f['title']}."
             rtf = RTFBuilder.escape(plain)
-        return plain.strip(), rtf.strip()
+        return CitationFormatter._finish(plain, rtf)
     
     @staticmethod
-    def format_vancouver(entry: Dict, idx: int = 1, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False) -> tuple:
+    def format_vancouver(entry: Dict, idx: int = 1, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False, mark_elements: bool = False) -> tuple:
         """Vancouver style"""
-        f = CitationFormatter._get_fields(entry)
+        f = CitationFormatter._get_fields(entry, mark_elements)
         auth = AuthorFormatter.vancouver(f['authors'], max_n=max_n, reverse_authors=reverse_authors) if max_n is not None else AuthorFormatter.vancouver(f['authors'], reverse_authors=reverse_authors)
+        auth = CitationFormatter._author(auth, mark_elements)
         pages = f['pages'].replace("–", "-")
         vol_issue = f"{f['volume']}({f['issue']})" if f['issue'] else f['volume']
 
@@ -410,13 +470,14 @@ class CitationFormatter:
             else:
                 plain = f"{idx}. {auth}. {f['title']}. {f['year']}."
             rtf = RTFBuilder.escape(plain)
-        return plain.strip(), rtf.strip()
+        return CitationFormatter._finish(plain, rtf)
     
     @staticmethod
-    def format_angewandte(entry: Dict, idx: int = 0, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False) -> tuple:
+    def format_angewandte(entry: Dict, idx: int = 0, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False, mark_elements: bool = False) -> tuple:
         """Angewandte Chemie style"""
-        f = CitationFormatter._get_fields(entry)
+        f = CitationFormatter._get_fields(entry, mark_elements)
         auth = AuthorFormatter.nature(f['authors'], max_n=max_n, reverse_authors=reverse_authors) if max_n is not None else AuthorFormatter.nature(f['authors'], reverse_authors=reverse_authors)
+        auth = CitationFormatter._author(auth, mark_elements)
 
         if f['entry_type'] == "article":
             plain = f"{auth}, {f['journal']} {f['year']}, {f['volume']}, {f['pages']}."
@@ -444,13 +505,14 @@ class CitationFormatter:
             else:
                 plain = f"{auth}, {f['title']}, {f['year']}."
             rtf = RTFBuilder.escape(plain)
-        return plain.strip(), rtf.strip()
+        return CitationFormatter._finish(plain, rtf)
     
     @staticmethod
-    def format_rsc(entry: Dict, idx: int = 0, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False) -> tuple:
+    def format_rsc(entry: Dict, idx: int = 0, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False, mark_elements: bool = False) -> tuple:
         """RSC style"""
-        f = CitationFormatter._get_fields(entry)
+        f = CitationFormatter._get_fields(entry, mark_elements)
         auth = AuthorFormatter.nature(f['authors'], max_n=max_n, reverse_authors=reverse_authors) if max_n is not None else AuthorFormatter.nature(f['authors'], reverse_authors=reverse_authors)
+        auth = CitationFormatter._author(auth, mark_elements)
 
         if f['entry_type'] == "article":
             plain = f"{auth}, {f['journal']}, {f['year']}, {f['volume']}, {f['pages']}."
@@ -478,13 +540,14 @@ class CitationFormatter:
             else:
                 plain = f"{auth}, {f['title']}, {f['year']}."
             rtf = RTFBuilder.escape(plain)
-        return plain.strip(), rtf.strip()
+        return CitationFormatter._finish(plain, rtf)
     
     @staticmethod
-    def format_aoa(entry: Dict, idx: int = 0, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False) -> tuple:
+    def format_aoa(entry: Dict, idx: int = 0, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False, mark_elements: bool = False) -> tuple:
         """AoA (Accounts of Chemical Research) style"""
-        f = CitationFormatter._get_fields(entry)
+        f = CitationFormatter._get_fields(entry, mark_elements)
         auth = AuthorFormatter.acs(f['authors'], max_n=max_n, reverse_authors=reverse_authors) if max_n is not None else AuthorFormatter.acs(f['authors'], reverse_authors=reverse_authors)
+        auth = CitationFormatter._author(auth, mark_elements)
 
         if f['entry_type'] == "article":
             if omit_title:
@@ -519,13 +582,14 @@ class CitationFormatter:
             else:
                 plain = f"{auth} {f['title']}. {f['year']}."
             rtf = RTFBuilder.escape(plain)
-        return plain.strip(), rtf.strip()
+        return CitationFormatter._finish(plain, rtf)
     
     @staticmethod
-    def format_nature(entry: Dict, idx: int = 1, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False) -> tuple:
+    def format_nature(entry: Dict, idx: int = 1, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False, mark_elements: bool = False) -> tuple:
         """Nature style"""
-        f = CitationFormatter._get_fields(entry)
+        f = CitationFormatter._get_fields(entry, mark_elements)
         auth = AuthorFormatter.nature(f['authors'], max_n=max_n, reverse_authors=reverse_authors) if max_n is not None else AuthorFormatter.nature(f['authors'], reverse_authors=reverse_authors)
+        auth = CitationFormatter._author(auth, mark_elements)
 
         if f['entry_type'] == "article":
             if omit_title:
@@ -565,13 +629,14 @@ class CitationFormatter:
             else:
                 plain = f"{idx}. {auth} {f['title']} ({f['year']})."
             rtf = RTFBuilder.escape(plain)
-        return plain.strip(), rtf.strip()
+        return CitationFormatter._finish(plain, rtf)
     
     @staticmethod
-    def format_ieee(entry: Dict, idx: int = 1, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False) -> tuple:
+    def format_ieee(entry: Dict, idx: int = 1, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False, mark_elements: bool = False) -> tuple:
         """IEEE style"""
-        f = CitationFormatter._get_fields(entry)
+        f = CitationFormatter._get_fields(entry, mark_elements)
         auth = AuthorFormatter.ieee(f['authors'], max_n=max_n, reverse_authors=reverse_authors) if max_n is not None else AuthorFormatter.ieee(f['authors'], reverse_authors=reverse_authors)
+        auth = CitationFormatter._author(auth, mark_elements)
 
         if f['entry_type'] == "article":
             parts = []
@@ -608,13 +673,14 @@ class CitationFormatter:
             else:
                 plain = f"[{idx}] {auth}, \"{f['title']},\" {f['year']}."
             rtf = RTFBuilder.escape(plain)
-        return plain.strip(), rtf.strip()
+        return CitationFormatter._finish(plain, rtf)
     
     @staticmethod
-    def format_iso690(entry: Dict, idx: int = 1, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False) -> tuple:
+    def format_iso690(entry: Dict, idx: int = 1, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False, mark_elements: bool = False) -> tuple:
         """ISO 690 style"""
-        f = CitationFormatter._get_fields(entry)
+        f = CitationFormatter._get_fields(entry, mark_elements)
         auth = AuthorFormatter.iso690(f['authors'], max_n=max_n, reverse_authors=reverse_authors) if max_n is not None else AuthorFormatter.iso690(f['authors'], reverse_authors=reverse_authors)
+        auth = CitationFormatter._author(auth, mark_elements)
         vol_issue = f"{f['volume']}({f['issue']})" if f['issue'] else f['volume']
 
         if f['entry_type'] == "article":
@@ -658,13 +724,14 @@ class CitationFormatter:
             else:
                 plain = f"[{idx}] {auth}. {f['title']}. {f['year']}."
             rtf = RTFBuilder.escape(plain)
-        return plain.strip(), rtf.strip()
+        return CitationFormatter._finish(plain, rtf)
     
     @staticmethod
-    def format_harvard(entry: Dict, idx: int = 0, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False) -> tuple:
+    def format_harvard(entry: Dict, idx: int = 0, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False, mark_elements: bool = False) -> tuple:
         """Harvard style"""
-        f = CitationFormatter._get_fields(entry)
+        f = CitationFormatter._get_fields(entry, mark_elements)
         auth = AuthorFormatter.harvard(f['authors'], max_n=max_n, reverse_authors=reverse_authors) if max_n is not None else AuthorFormatter.harvard(f['authors'], reverse_authors=reverse_authors)
+        auth = CitationFormatter._author(auth, mark_elements)
 
         if f['entry_type'] == "article":
             # Harvard: Author (Year) 'Title', Journal, Volume(Issue), Pages.
@@ -705,7 +772,111 @@ class CitationFormatter:
             else:
                 plain = f"{auth} ({f['year']}) '{f['title']}'."
             rtf = RTFBuilder.escape(plain)
-        return plain.strip(), rtf.strip()
+        return CitationFormatter._finish(plain, rtf)
+
+    @staticmethod
+    def format_bcsj(entry: Dict, idx: int = 0, max_n: int = None, omit_title: bool = False, reverse_authors: bool = False, mark_elements: bool = False) -> tuple:
+        """BCSJ / Chem. Lett. (CSJ style).
+
+        Article: A. B. Family, C. D. Family, J. Abbr. **Year**, Vol, FirstPage.
+          (journal and volume italic, year bold; no article title, no issue; first page only)
+        Book:    A. B. Family, Title, 2nd ed., ed. by E. Ditor, Publisher, Place, **Year**, Vol. 1, pp. 1–9.
+        Chapter: A. B. Family, in Book Title, ed. by E. Ditor, Publisher, Place, **Year**, Vol. 1, Chap. 6, pp. 1–9.
+        Thesis:  A. B. Family, Ph.D. Thesis, University, Place, **Year**.
+        DOI (when present): appended as "doi:10.xxx" after the page, or in place of a missing page.
+        Source: CSJ "New CSJ Style for References and Notes" and the BCSJ manuscript example (2026).
+        """
+        mark = mark_elements
+        f = CitationFormatter._get_fields(entry, mark)
+        auth = AuthorFormatter.csj(f['authors'], max_n=max_n, reverse_authors=reverse_authors)
+        auth = CitationFormatter._author(auth, mark)
+
+        def m(name: str, value: str) -> str:
+            return mark_element(name, value) if mark else value
+
+        raw_pages = entry.get("pages", "").replace("--", "–").strip()
+        is_range = bool(re.search(r"[–—-]", raw_pages))
+
+        def book_pages():
+            if not raw_pages:
+                return None
+            return [("t", "pp. " if is_range else "p. "), ("t", m("pages", raw_pages))]
+
+        def edition_text():
+            ed = entry.get("edition", "").strip()
+            if not ed:
+                return ""
+            if ed.isdigit():
+                n = int(ed)
+                suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+                return f"{n}{suffix} ed."
+            return ed if re.search(r"ed\.?$", ed, re.IGNORECASE) else f"{ed} ed."
+
+        def editors_text():
+            eds = BibTeXProcessor.parse_authors(entry.get("editor", ""))
+            return f"ed. by {AuthorFormatter.csj(eds)}" if eds else ""
+
+        fields = []          # each field: list of (kind, text); kind t=plain, i=italic, b=bold
+
+        def add(*segments):
+            segs = [s for s in segments if s and s[1]]
+            if segs:
+                fields.append(segs)
+
+        etype = f['entry_type']
+        booktitle = BibTeXProcessor.clean_latex(entry.get("booktitle", ""))
+        if etype == "article":
+            add(("t", auth))
+            head = [("i", f['journal'])] if f['journal'] else []
+            if f['year']:
+                head += ([("t", " ")] if head else []) + [("b", f['year'])]
+            add(*head)
+            add(("i", f['volume']))
+            first_page = re.split(r"\s*[–—-]\s*", raw_pages)[0] if raw_pages else ""
+            add(("t", m("pages", first_page)))
+            if f['doi']:
+                add(("t", "doi:"), ("t", f['doi']))
+        elif etype in ("book", "incollection", "inbook") and (etype == "book" or booktitle):
+            add(("t", auth))
+            if etype == "book":
+                if not omit_title:
+                    add(("i", f['title']))
+            else:
+                add(("t", "in "), ("i", m("title", booktitle)))
+            add(("t", edition_text()))
+            add(("t", editors_text()))
+            add(("t", f['publisher']))
+            add(("t", f['address']))
+            add(("b", f['year']))
+            if f['volume']:
+                add(("t", "Vol. "), ("t", f['volume']))
+            if entry.get("chapter", "").strip():
+                add(("t", "Chap. " + entry["chapter"].strip()))
+            pg = book_pages()
+            if pg:
+                add(*pg)
+        elif etype in ("phdthesis", "mastersthesis"):
+            add(("t", auth))
+            add(("t", "Ph.D. Thesis" if etype == "phdthesis" else "M.S. Thesis"))
+            add(("t", BibTeXProcessor.clean_latex(entry.get("school", ""))))
+            add(("t", f['address']))
+            add(("b", f['year']))
+        else:
+            add(("t", auth))
+            if not omit_title:
+                add(("t", f['title']))
+            add(("b", f['year']))
+
+        def seg_rtf(kind, text):
+            if kind == "i":
+                return RTFBuilder.italic(text)
+            if kind == "b":
+                return RTFBuilder.bold(text)
+            return RTFBuilder.escape(text)
+
+        plain = ", ".join("".join(t for _, t in fld) for fld in fields) + "."
+        rtf = ", ".join("".join(seg_rtf(k, t) for k, t in fld) for fld in fields) + "."
+        return CitationFormatter._finish(plain, rtf)
 
 class HTMLBuilder:
     """HTML formatting helper for web display"""
@@ -768,6 +939,7 @@ REFERENCE_STYLES = {
     "Vancouver": CitationFormatter.format_vancouver,
     "Angewandte": CitationFormatter.format_angewandte,
     "RSC": CitationFormatter.format_rsc,
+    "BCSJ": CitationFormatter.format_bcsj,
     "AoA": CitationFormatter.format_aoa,
     "Nature": CitationFormatter.format_nature,
     "IEEE": CitationFormatter.format_ieee,
