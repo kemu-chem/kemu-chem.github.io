@@ -17,7 +17,10 @@
         [data-theme="dark"] .doi-example { background-color: var(--input-bg); border-color: var(--border-color); }
 
         /* Detail (output formatting) panel */
-        .detail-bar { margin-top: 8px; }
+        .detail-bar { margin-top: 8px; display: flex; align-items: center; gap: 12px; }
+        .csl-numbers { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; }
+        .csl-numbers[hidden] { display: none; }
+        .csl-credit { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
         .detail-btn { padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 5px; background: var(--surface-muted); color: var(--text-color); cursor: pointer; white-space: nowrap; }
         .detail-btn:hover { border-color: var(--primary); }
         .detail-btn[aria-expanded="true"] .detail-caret { display: inline-block; transform: rotate(180deg); }
@@ -66,16 +69,20 @@
 
         <div style="display: flex; gap: 10px; align-items: center;">
             <select id="style_select">
-                <option>ACS</option>
-                <option>APA (7th)</option>
-                <option>Harvard</option>
-                <option>Vancouver</option>
-                <option>Angewandte</option>
-                <option>RSC</option>
-                <option>BCSJ</option>
-                <option>Nature</option>
-                <option>IEEE</option>
-                <option>ISO 690</option>
+                <optgroup label="Legacy">
+                    <option>ACS</option>
+                    <option>APA (7th)</option>
+                    <option>Harvard</option>
+                    <option>Vancouver</option>
+                    <option>Angewandte</option>
+                    <option>RSC</option>
+                    <option>BCSJ</option>
+                    <option>Nature</option>
+                    <option>IEEE</option>
+                    <option>ISO 690</option>
+                </optgroup>
+                <!-- filled by src/csl_engine.js -->
+                <optgroup label="CSL (beta)" id="csl_style_group"></optgroup>
             </select>
             <select id="sort_select">
                 <option>Order of Appearance</option>
@@ -107,6 +114,10 @@
         <div class="detail-bar">
             <button type="button" id="detail_btn" class="detail-btn" aria-expanded="false"
                 aria-controls="detail_panel" title="Output font / size">Detail <span class="detail-caret">&#9662;</span></button>
+            <label id="csl_numbers_label" class="csl-numbers" hidden
+                title="CSL styles: show or hide reference numbers (hide when Word numbers the list)">
+                <input type="checkbox" id="csl_numbers_check" checked> Numbers
+            </label>
         </div>
         <div id="detail_panel" class="detail-panel" hidden>
             <div class="detail-row">
@@ -153,6 +164,9 @@
             </ul>
         </div>
 
+        <div class="csl-credit">CSL (beta) styles: <a href="https://citationstyles.org/" target="_blank" rel="noopener">Citation Style Language</a>
+            project (CC BY-SA 3.0), formatted with <a href="https://github.com/Juris-M/citeproc-js" target="_blank" rel="noopener">citeproc-js</a>
+            (CPAL / AGPL, unmodified; see src/csl/).</div>
         <div id="author" style="font-size: small;">Author: kemu-chem</div>
         <div id="version" style="font-size: small;">RefConverter v1.0.1</div>
     </div>
@@ -160,7 +174,7 @@
     <py-config>
         packages = ["bibtexparser==1.3.0", "rispy==0.10.0"]
         [[fetch]]
-        files = ["src/bibcite_core.py","src/riscite_core.py", "src/doicite_core.py", "src/journal_abbr.json"]
+        files = ["src/bibcite_core.py","src/riscite_core.py", "src/doicite_core.py", "src/cslconv_core.py", "src/journal_abbr.json"]
     </py-config>
 
     <script type="py">
@@ -430,6 +444,19 @@
                 elif "Year" in sort_name:
                     entries.sort(key=lambda x: int(re.search(r'\d{4}', x.get("year", "0")).group()) if re.search(r'\d{4}', x.get("year", "")) else 0)
 
+                if style_name.startswith("csl:"):
+                    # CSL (beta): citeproc-js (src/csl_engine.js) formats CSL-JSON built from the
+                    # same entries. Styles with their own bibliography sort override "Sort".
+                    import json as _json
+                    import js as _js
+                    from src.cslconv_core import entries_to_csl_json
+                    items_json = entries_to_csl_json(entries, abbr=JOURNAL_ABBR if use_abbr else None,
+                                                     show_doi=show_doi, omit_title=omit_title)
+                    opts_json = _json.dumps({"maxAuthors": max_n,
+                                             "showNumbers": document.querySelector("#csl_numbers_check").checked})
+                    output_div.innerHTML = await _js.window.RefCSL.render(style_name[4:], items_json, opts_json)
+                    return
+
                 for i, entry in enumerate(entries, 1):
                     display_entry = dict(entry)
                     if use_abbr and 'journal' in display_entry:
@@ -454,6 +481,7 @@
         js.window.py_on_convert = on_convert
     </script>
 
+    <script src="src/csl_engine.js"></script>
     <script>
         // Output "Detail" panel: display-only formatting of #output.
         //  - font / size: global, applied as inline style on #output
@@ -518,7 +546,8 @@
             }
 
             function buildElementChips() {
-                styleNameEl.textContent = styleSel.value;
+                const opt = styleSel.options[styleSel.selectedIndex];
+                styleNameEl.textContent = opt ? opt.textContent : styleSel.value;
                 const ov = styleOverrides();
                 elemsBox.textContent = '';
                 ELEMENTS.forEach(([id, label]) => {
@@ -544,7 +573,9 @@
                 });
             }
 
-            // Inline styles on the element spans (only for overridden props; '' restores the style default)
+            // Inline styles on the element spans (only for overridden props; '' restores the style default).
+            // Spans sit inside the style's own <i>/<b> (legacy output; CSL output is rearranged the
+            // same way in csl_engine.js), so the span's own inline style wins over the inherited one.
             function applyElementStyles() {
                 const ov = styleOverrides();
                 output.querySelectorAll('span[class^="cit-"]').forEach(span => {
@@ -561,6 +592,7 @@
                 output.style.fontSize = pt ? pt + 'pt' : '';
                 buildElementChips();
                 applyElementStyles();
+                document.getElementById('csl_numbers_label').hidden = !window.RefCSL.isCsl(styleSel.value);
                 btn.classList.toggle('is-custom',
                     !!(output.style.fontFamily || output.style.fontSize || Object.keys(styleOverrides()).length));
             }
@@ -644,7 +676,8 @@
         const STYLES_NEED_ABBR = ['BCSJ'];
         document.getElementById('style_select').addEventListener('change', (e) => {
             const abbr = document.getElementById('abbrev_journal_check');
-            if (STYLES_NEED_ABBR.includes(e.target.value) && !abbr.checked) abbr.checked = true;
+            const v = e.target.value;
+            if ((STYLES_NEED_ABBR.includes(v) || window.RefCSL.needsAbbr(v)) && !abbr.checked) abbr.checked = true;
         });
 
         const dropZone = document.getElementById('drop_zone');
@@ -715,6 +748,7 @@
                 reverseAuthorsCheck.addEventListener('change', triggerConvert);
                 abbrevJournalCheck.addEventListener('change', triggerConvert);
                 showDoiCheck.addEventListener('change', triggerConvert);
+                document.getElementById('csl_numbers_check').addEventListener('change', triggerConvert);
             };
 
             // Wait for PyScript to initialize
@@ -741,6 +775,7 @@
                     abbrev_journal: abbrevJournalCheck.checked,
                     show_doi: showDoiCheck.checked,
                     input_text: bibInput.value,
+                    csl_numbers: document.getElementById('csl_numbers_check').checked,
                     detail: window.RefDetail.getState()
                 });
 
@@ -754,6 +789,7 @@
                     if (state.abbrev_journal !== undefined) abbrevJournalCheck.checked = state.abbrev_journal;
                     if (state.show_doi !== undefined) showDoiCheck.checked = state.show_doi;
                     if (state.input_text !== undefined && !bibInput.value) bibInput.value = state.input_text;
+                    if (state.csl_numbers !== undefined) document.getElementById('csl_numbers_check').checked = state.csl_numbers;
                     window.RefDetail.applyState(state.detail);
                     triggerConvert();
                 };
@@ -774,6 +810,7 @@
                     el.addEventListener('input', notifyChange);
                 });
                 window.RefDetail.onChange = notifyChange;
+                document.getElementById('csl_numbers_check').addEventListener('change', notifyChange);
             }
         });
     </script>
