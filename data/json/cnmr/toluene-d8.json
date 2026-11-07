@@ -1,0 +1,494 @@
+[
+  {
+    "compound": "Solvent Residual",
+    "proton": "",
+    "multiplicity": "",
+    "shift": "137.48"
+  },
+  {
+    "compound": "Solvent Residual",
+    "proton": "",
+    "multiplicity": "",
+    "shift": "128.87"
+  },
+  {
+    "compound": "Solvent Residual",
+    "proton": "",
+    "multiplicity": "",
+    "shift": "127.96"
+  },
+  {
+    "compound": "Solvent Residual",
+    "proton": "",
+    "multiplicity": "",
+    "shift": "125.13"
+  },
+  {
+    "compound": "Solvent Residual",
+    "proton": "",
+    "multiplicity": "",
+    "shift": "20.43"
+  },
+  {
+    "compound": "AcOH",
+    "proton": "CO",
+    "multiplicity": "",
+    "shift": "175.30"
+  },
+  {
+    "compound": "AcOH",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "20.27"
+  },
+  {
+    "compound": "acetone",
+    "proton": "CO",
+    "multiplicity": "",
+    "shift": "204.00"
+  },
+  {
+    "compound": "acetone",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "30.03"
+  },
+  {
+    "compound": "MeCN",
+    "proton": "CN",
+    "multiplicity": "",
+    "shift": "115.76"
+  },
+  {
+    "compound": "MeCN",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "0.03"
+  },
+  {
+    "compound": "benzene",
+    "proton": "CH",
+    "multiplicity": "",
+    "shift": "128.57"
+  },
+  {
+    "compound": "t-BuOH",
+    "proton": "C",
+    "multiplicity": "",
+    "shift": "68.12"
+  },
+  {
+    "compound": "t-BuOH",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "30.49"
+  },
+  {
+    "compound": "CO2",
+    "proton": "CO2",
+    "multiplicity": "",
+    "shift": "124.86"
+  },
+  {
+    "compound": "CS2",
+    "proton": "CS2",
+    "multiplicity": "",
+    "shift": "192.71"
+  },
+  {
+    "compound": "CCl4",
+    "proton": "CCl4",
+    "multiplicity": "",
+    "shift": "96.57"
+  },
+  {
+    "compound": "CHCl3",
+    "proton": "CH",
+    "multiplicity": "",
+    "shift": "77.89"
+  },
+  {
+    "compound": "18-crown-6",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "70.86"
+  },
+  {
+    "compound": "cyclohexane",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "27.31"
+  },
+  {
+    "compound": "1,2-DCE",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "43.40"
+  },
+  {
+    "compound": "DCM",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "53.47"
+  },
+  {
+    "compound": "Et2O",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "15.47"
+  },
+  {
+    "compound": "Et2O",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "65.94"
+  },
+  {
+    "compound": "diglyme",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "58.62"
+  },
+  {
+    "compound": "diglyme",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "70.92"
+  },
+  {
+    "compound": "diglyme",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "72.39"
+  },
+  {
+    "compound": "DMF",
+    "proton": "CH",
+    "multiplicity": "",
+    "shift": "161.93"
+  },
+  {
+    "compound": "DMF",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "35.22"
+  },
+  {
+    "compound": "DMF",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "30.64"
+  },
+  {
+    "compound": "1,4-dioxane",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "67.17"
+  },
+  {
+    "compound": "DME",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "58.63"
+  },
+  {
+    "compound": "DME",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "72.25"
+  },
+  {
+    "compound": "ethane",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "6.94"
+  },
+  {
+    "compound": "EtOH",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "18.78"
+  },
+  {
+    "compound": "EtOH",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "57.81"
+  },
+  {
+    "compound": "EtOAc",
+    "proton": "CH3CO",
+    "multiplicity": "",
+    "shift": "20.46"
+  },
+  {
+    "compound": "EtOAc",
+    "proton": "CO",
+    "multiplicity": "",
+    "shift": "170.02"
+  },
+  {
+    "compound": "EtOAc",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "60.08"
+  },
+  {
+    "compound": "EtOAc",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "14.23"
+  },
+  {
+    "compound": "ethylene",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "122.92"
+  },
+  {
+    "compound": "ethylene glycol",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "64.29"
+  },
+  {
+    "compound": "H grease",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "30.31"
+  },
+  {
+    "compound": "hexamethylbenzene",
+    "proton": "C",
+    "multiplicity": "",
+    "shift": "131.72"
+  },
+  {
+    "compound": "hexamethylbenzene",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "16.84"
+  },
+  {
+    "compound": "n-hexane",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "14.34"
+  },
+  {
+    "compound": "n-hexane",
+    "proton": "CH2(2,5)",
+    "multiplicity": "",
+    "shift": "23.12"
+  },
+  {
+    "compound": "n-hexane",
+    "proton": "CH2(3,4)",
+    "multiplicity": "",
+    "shift": "32.06"
+  },
+  {
+    "compound": "HMDSO",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "1.99"
+  },
+  {
+    "compound": "HMPA",
+    "proton": "CH3",
+    "multiplicity": "d, 3",
+    "shift": "36.80"
+  },
+  {
+    "compound": "imidazole",
+    "proton": "CH(2)",
+    "multiplicity": "",
+    "shift": "135.57"
+  },
+  {
+    "compound": "imidazole",
+    "proton": "CH(4,5)",
+    "multiplicity": "",
+    "shift": "122.13"
+  },
+  {
+    "compound": "CH4",
+    "proton": "CH4",
+    "multiplicity": "",
+    "shift": "-4.34"
+  },
+  {
+    "compound": "MeOH",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "49.90"
+  },
+  {
+    "compound": "MeNO2",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "61.14"
+  },
+  {
+    "compound": "n-pentane",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "14.27"
+  },
+  {
+    "compound": "n-pentane",
+    "proton": "CH2(2,4)",
+    "multiplicity": "",
+    "shift": "22.79"
+  },
+  {
+    "compound": "n-pentane",
+    "proton": "CH2(3)",
+    "multiplicity": "",
+    "shift": "34.54"
+  },
+  {
+    "compound": "propane",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "16.65"
+  },
+  {
+    "compound": "propane",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "16.63"
+  },
+  {
+    "compound": "2-propanol",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "25.24"
+  },
+  {
+    "compound": "2-propanol",
+    "proton": "CH",
+    "multiplicity": "",
+    "shift": "64.12"
+  },
+  {
+    "compound": "propylene",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "19.32"
+  },
+  {
+    "compound": "propylene",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "115.89"
+  },
+  {
+    "compound": "propylene",
+    "proton": "CH",
+    "multiplicity": "",
+    "shift": "133.61"
+  },
+  {
+    "compound": "pyridine",
+    "proton": "CH(2,6)",
+    "multiplicity": "",
+    "shift": "150.25"
+  },
+  {
+    "compound": "pyridine",
+    "proton": "CH(3,5)",
+    "multiplicity": "",
+    "shift": "123.46"
+  },
+  {
+    "compound": "pyridine",
+    "proton": "CH(4)",
+    "multiplicity": "",
+    "shift": "135.17"
+  },
+  {
+    "compound": "pyrrole",
+    "proton": "CH(2,5)",
+    "multiplicity": "",
+    "shift": "117.61"
+  },
+  {
+    "compound": "pyrrole",
+    "proton": "CH(3,4)",
+    "multiplicity": "",
+    "shift": "108.15"
+  },
+  {
+    "compound": "pyrrolidine",
+    "proton": "CH2(2,5)",
+    "multiplicity": "",
+    "shift": "47.12"
+  },
+  {
+    "compound": "pyrrolidine",
+    "proton": "CH2(3,4)",
+    "multiplicity": "",
+    "shift": "25.75"
+  },
+  {
+    "compound": "silicone grease",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "1.37"
+  },
+  {
+    "compound": "THF",
+    "proton": "CH2(2,5)",
+    "multiplicity": "",
+    "shift": "67.75"
+  },
+  {
+    "compound": "THF",
+    "proton": "CH2(3,4)",
+    "multiplicity": "",
+    "shift": "25.79"
+  },
+  {
+    "compound": "toluene",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "21.37"
+  },
+  {
+    "compound": "toluene",
+    "proton": "C(1)",
+    "multiplicity": "",
+    "shift": "137.84"
+  },
+  {
+    "compound": "toluene",
+    "proton": "CH(2,6)",
+    "multiplicity": "",
+    "shift": "129.33"
+  },
+  {
+    "compound": "toluene",
+    "proton": "CH(3,5)",
+    "multiplicity": "",
+    "shift": "128.51"
+  },
+  {
+    "compound": "toluene",
+    "proton": "CH(4)",
+    "multiplicity": "",
+    "shift": "125.66"
+  },
+  {
+    "compound": "triethylamine",
+    "proton": "CH3",
+    "multiplicity": "",
+    "shift": "12.39"
+  },
+  {
+    "compound": "triethylamine",
+    "proton": "CH2",
+    "multiplicity": "",
+    "shift": "46.82"
+  }
+]

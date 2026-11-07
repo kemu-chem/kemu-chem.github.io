@@ -2,14 +2,26 @@
   {
     "compound": "Solvent Residual",
     "proton": "",
-    "multiplicity": "1.72",
-    "shift": "7.16"
+    "multiplicity": "",
+    "shift": "2.08"
   },
   {
     "compound": "Solvent Residual",
     "proton": "",
-    "multiplicity": "3.58",
+    "multiplicity": "",
     "shift": "6.97"
+  },
+  {
+    "compound": "Solvent Residual",
+    "proton": "",
+    "multiplicity": "",
+    "shift": "7.01"
+  },
+  {
+    "compound": "Solvent Residual",
+    "proton": "",
+    "multiplicity": "",
+    "shift": "7.09"
   },
   {
     "compound": "H2O",

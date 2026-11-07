@@ -442,8 +442,8 @@
         <!-- Nucleus Tabs -->
         <div class="nucleus-tabs" id="nucleusTabs">
             <div class="nucleus-tab active" data-nucleus="hnmr"><sup>1</sup>H</div>
-            <div class="nucleus-tab disabled" data-nucleus="cnmr" title="Coming soon"><sup>13</sup>C</div>
-            <div class="nucleus-tab disabled" data-nucleus="fnmr" title="Coming soon"><sup>19</sup>F</div>
+            <div class="nucleus-tab" data-nucleus="cnmr"><sup>13</sup>C</div>
+            <div class="nucleus-tab" data-nucleus="fnmr"><sup>19</sup>F</div>
         </div>
 
         <!-- Solvent Selector -->
@@ -476,7 +476,7 @@
         <div class="info-card" id="infoCard">
             <div class="compound-name" id="infoCompound"></div>
             <div class="detail-row">
-                <span class="detail-label">Proton:</span>
+                <span class="detail-label" id="infoGroupLabel">Proton:</span>
                 <span id="infoProton"></span>
             </div>
             <div class="detail-row">
@@ -492,10 +492,8 @@
 
     <footer
         style="text-align: center; margin-top: 30px; color: var(--text-dim); font-size: 0.75em; padding-bottom: 20px;">
-        Data: Fulmer, G. R.; Miller, A. J. M.; Sherden, N. H.; Gottlieb, H. E.; Nudelman, A.; Stoltz, B. M.; Bercaw, J.
-        E.; Goldberg, K. I. NMR Chemical Shifts of Trace Impurities: Common Laboratory Solvents, Organics, and Gases in
-        Deuterated Solvents Relevant to the Organometallic Chemist. <i>Organometallics</i> <b>2010</b>, 29 (9),
-        2176&ndash;2179. https://doi.org/10.1021/om100106e.
+        <div>Data (<sup>1</sup>H, <sup>13</sup>C): Fulmer, G. R.; Miller, A. J. M.; Sherden, N. H.; Gottlieb, H. E.; Nudelman, A.; Stoltz, B. M.; Bercaw, J. E.; Goldberg, K. I. <i>Organometallics</i> <b>2010</b>, 29 (9), 2176&ndash;2179. https://doi.org/10.1021/om100106e.</div>
+        <div>Data (<sup>19</sup>F): Rosenau, C. P.; Jelier, B. J.; Gossert, A. D.; Togni, A. <i>Angew. Chem. Int. Ed.</i> <b>2018</b>, 57 (30), 9528&ndash;9533. https://doi.org/10.1002/anie.201802620.</div>
     </footer>
     <script>
         (() => {
@@ -550,16 +548,17 @@
                 ];
 
                 const NUCLEI = {
-                    hnmr: { label: '¹H', dir: 'hnmr', min: -0.5, max: 12 },
-                    cnmr: { label: '¹³C', dir: 'cnmr', min: -10, max: 230 },
-                    fnmr: { label: '¹⁹F', dir: 'fnmr', min: -220, max: 0 },
+                    hnmr: { label: '¹H', dir: 'hnmr', min: -0.5, max: 12, groupLabel: 'Proton:' },
+                    cnmr: { label: '¹³C', dir: 'cnmr', min: -10, max: 230, groupLabel: 'Carbon:' },
+                    fnmr: { label: '¹⁹F', dir: 'fnmr', min: -220, max: 10, groupLabel: 'Fluorine:' },
                 };
 
                 const COMMON_IMPURITIES = new Set([
-                    'H2O', 'hexane', 'EtOAc', 'acetone', 'MeOH', 'EtOH',
+                    'H2O', 'hexane', 'n-hexane', 'n-pentane', 'EtOAc', 'acetone', 'MeOH', 'EtOH',
                     'Et2O', 'toluene', 'DCM', 'CHCl3', 'MeCN',
                     'DMF', 'DMSO', 'benzene', 'pyridine', 'AcOH',
-                    'THF', '1,4-dioxane', 'Et3N', 'hmdso', 'hgrease', 'silicone grease'
+                    'THF', '1,4-dioxane', 'Et3N', 'triethylamine', 'hmdso', 'hgrease', 'h grease', 'silicone grease',
+                    'CFCl3', 'C6H5F', 'PhCF3', 'C6F6', 'CF3CO2H'
                 ].map(s => s.toLowerCase()));
 
                 function sanitizeEntry(e) {
@@ -758,7 +757,18 @@
                     svgEl.appendChild(linesLayer);
                     svgEl.appendChild(labelsLayer);
 
-                    if (entries.length === 0) return;
+                    if (entries.length === 0) {
+                        const emptyMsg = createSVG('text', {
+                            x: svgWidth / 2,
+                            y: (MARGIN.top + BASELINE_Y()) / 2,
+                            'text-anchor': 'middle',
+                            fill: 'var(--text-muted)',
+                            'font-size': '13px'
+                        });
+                        emptyMsg.textContent = 'No reference data available for this solvent / nucleus';
+                        labelsLayer.appendChild(emptyMsg);
+                        return;
+                    }
 
                     // Sort by shift for collision detection
                     const sorted = [...entries].sort((a, b) => a.shiftMid - b.shiftMid);
@@ -1059,7 +1069,8 @@
                     const q = query.trim().toLowerCase();
                     const isNumeric = /^-?\d+\.?\d*$/.test(q);
                     const numVal = isNumeric ? parseFloat(q) : null;
-                    const tolerance = 0.05;
+                    const fullRange = (defaultMax - defaultMin) || 12.5;
+                    const tolerance = fullRange > 50 ? 0.5 : 0.05;
 
                     let hasMatch = false;
                     currentEntries.forEach(entry => {
@@ -1084,7 +1095,7 @@
 
                     // Fallback to nearest peak if numeric search has no exact match
                     if (isNumeric && numVal !== null && !hasMatch) {
-                        const fallbackTolerance = 0.3; // Allow up to 0.3 ppm distance
+                        const fallbackTolerance = fullRange > 50 ? 2.0 : 0.3;
                         let closestEntry = null;
                         let minDiff = Infinity;
 
@@ -1238,6 +1249,10 @@
                 async function loadAndRender(solventKey) {
                     const entries = await NMRData.loadSolvent(solventKey, currentNucleus);
                     const nucleus = NMRData.NUCLEI[currentNucleus];
+                    const groupLabelEl = document.getElementById('infoGroupLabel');
+                    if (groupLabelEl && nucleus.groupLabel) {
+                        groupLabelEl.textContent = nucleus.groupLabel;
+                    }
                     NMRSpectrum.setAxisRange(nucleus.min, nucleus.max);
                     NMRSpectrum.render(entries, true);
 
@@ -1253,14 +1268,20 @@
                     document.getElementById('infoCard').classList.remove('visible');
                 }
 
+                function selectNucleus(nucleusKey) {
+                    if (!NMRData.NUCLEI[nucleusKey] || nucleusKey === currentNucleus) return;
+                    currentNucleus = nucleusKey;
+                    document.querySelectorAll('.nucleus-tab').forEach(t => {
+                        t.classList.toggle('active', t.dataset.nucleus === nucleusKey);
+                    });
+                    loadAndRender(currentSolvent);
+                }
+
                 function bindNucleusTabs() {
                     document.querySelectorAll('.nucleus-tab').forEach(tab => {
                         tab.addEventListener('click', () => {
                             if (tab.classList.contains('disabled')) return;
-                            document.querySelectorAll('.nucleus-tab').forEach(t => t.classList.remove('active'));
-                            tab.classList.add('active');
-                            currentNucleus = tab.dataset.nucleus;
-                            loadAndRender(currentSolvent);
+                            selectNucleus(tab.dataset.nucleus);
                         });
                     });
                 }
@@ -1411,7 +1432,13 @@
                     }, { passive: false });
                 }
 
-                return { init };
+                return {
+                    init,
+                    getSolvent: () => currentSolvent,
+                    getNucleus: () => currentNucleus,
+                    selectSolvent,
+                    selectNucleus
+                };
             })();
 
             // ===== Boot =====
@@ -1424,21 +1451,23 @@
 
                 const configManager = window.ToolsHandbookConfig || window.KemuConfig;
                 if (configManager) {
-                    const solventSelect = document.getElementById('solventSelect');
                     const searchInput = document.getElementById('searchInput');
 
                     const getNMRState = () => ({
-                        solvent: solventSelect.value,
+                        nucleus: NMRControls.getNucleus(),
+                        solvent: NMRControls.getSolvent(),
                         search: searchInput.value
                     });
 
                     const loadNMRState = (state) => {
                         if (!state) return;
-                        if (state.solvent) {
-                            solventSelect.value = state.solvent;
-                            solventSelect.dispatchEvent(new Event('change'));
+                        if (state.nucleus) {
+                            NMRControls.selectNucleus(state.nucleus);
                         }
-                        if (state.search) {
+                        if (state.solvent) {
+                            NMRControls.selectSolvent(state.solvent);
+                        }
+                        if (state.search !== undefined) {
                             searchInput.value = state.search;
                             searchInput.dispatchEvent(new Event('input'));
                         }
@@ -1450,7 +1479,8 @@
                     });
 
                     const notifyNMR = () => configManager.updateToolState('nmr_impurity_finder', getNMRState());
-                    solventSelect.addEventListener('change', notifyNMR);
+                    document.getElementById('solventPills').addEventListener('click', notifyNMR);
+                    document.getElementById('nucleusTabs').addEventListener('click', notifyNMR);
                     searchInput.addEventListener('input', notifyNMR);
                 }
             });

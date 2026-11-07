@@ -2,14 +2,8 @@
   {
     "compound": "Solvent Residual",
     "proton": "",
-    "multiplicity": "1.72",
-    "shift": "6.96"
-  },
-  {
-    "compound": "Solvent Residual",
-    "proton": "",
     "multiplicity": "",
-    "shift": "7.14"
+    "shift": "7.16"
   },
   {
     "compound": "H2O",
@@ -274,12 +268,6 @@
     "proton": "CH3",
     "multiplicity": "s",
     "shift": "3.07"
-  },
-  {
-    "compound": "MeOH",
-    "proton": "OH",
-    "multiplicity": "s",
-    "shift": "1.30"
   },
   {
     "compound": "MeNO2",

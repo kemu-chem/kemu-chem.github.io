@@ -2,8 +2,14 @@
   {
     "compound": "Solvent Residual",
     "proton": "",
-    "multiplicity": "1.72",
-    "shift": "3.31"
+    "multiplicity": "",
+    "shift": "5.02"
+  },
+  {
+    "compound": "Solvent Residual",
+    "proton": "",
+    "multiplicity": "",
+    "shift": "3.88"
   },
   {
     "compound": "H2O",
@@ -40,6 +46,12 @@
     "proton": "CH3",
     "multiplicity": "s",
     "shift": "1.28"
+  },
+  {
+    "compound": "t-BuOH",
+    "proton": "OH",
+    "multiplicity": "s",
+    "shift": "2.20"
   },
   {
     "compound": "CHCl3",

@@ -1,5 +1,11 @@
 [
   {
+    "compound": "Solvent Residual",
+    "proton": "",
+    "multiplicity": "",
+    "shift": "4.79"
+  },
+  {
     "compound": "AcOH",
     "proton": "CH3",
     "multiplicity": "s",

@@ -1,0 +1,32 @@
+[
+  {
+    "compound": "CFCl3",
+    "proton": "F",
+    "multiplicity": "s",
+    "shift": "-0.24"
+  },
+  {
+    "compound": "C6H5F",
+    "proton": "F",
+    "multiplicity": "m",
+    "shift": "-112.83"
+  },
+  {
+    "compound": "PhCF3",
+    "proton": "CF3",
+    "multiplicity": "s",
+    "shift": "-60.94"
+  },
+  {
+    "compound": "C6F6",
+    "proton": "F",
+    "multiplicity": "s",
+    "shift": "-162.45"
+  },
+  {
+    "compound": "CF3CO2H",
+    "proton": "CF3",
+    "multiplicity": "s",
+    "shift": "-74.95"
+  }
+]

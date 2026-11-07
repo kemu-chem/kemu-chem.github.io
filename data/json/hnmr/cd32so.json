@@ -2,8 +2,8 @@
   {
     "compound": "Solvent Residual",
     "proton": "",
-    "multiplicity": "1.72",
-    "shift": "1.94"
+    "multiplicity": "",
+    "shift": "2.50"
   },
   {
     "compound": "H2O",
@@ -381,13 +381,13 @@
     "compound": "pyrrolidine",
     "proton": "CH2(2,5)",
     "multiplicity": "m",
-    "shift": "2.75"
+    "shift": "2.67"
   },
   {
     "compound": "pyrrolidine",
     "proton": "CH2(3,4)",
     "multiplicity": "m",
-    "shift": "1.61"
+    "shift": "1.55"
   },
   {
     "compound": "silicone grease",
